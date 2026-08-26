@@ -8,51 +8,57 @@ import soundfile as sf
 
 
 def generate_voice_sample(
-    fundamental_freq: float = 180.0,
+    fundamental_freq: float = 160.0,
     duration_sec: float = 3.0,
     sr: int = 16000,
     is_synthetic: bool = False,
-    jitter: float = 0.02
+    jitter: float = 0.03
 ) -> np.ndarray:
     """
-    Generates synthetic or simulated natural voice audio signals.
-    - Genuine voice: rich harmonics, natural micro-jitter, formant filtering.
-    - Synthetic voice: robotic/flat pitch contour, high-frequency vocoder artifacts, spectral phase anomalies.
+    Generates realistic synthetic or simulated natural voice audio signals.
+    - Genuine voice: rich low-frequency formants (<3kHz), natural pitch drift, steep roll-off at >3.5kHz.
+    - Synthetic voice: robotic/flat pitch contour, high-frequency vocoder dispersion & hiss (>4.5kHz).
     """
     num_samples = int(sr * duration_sec)
     t = np.linspace(0, duration_sec, num_samples, endpoint=False)
 
     if not is_synthetic:
         # Genuine human voice simulation
-        # Add natural pitch drift / micro-jitter
-        pitch_contour = fundamental_freq + 10.0 * np.sin(2 * np.pi * 1.5 * t) + np.random.normal(0, jitter, num_samples)
+        pitch_contour = fundamental_freq + 8.0 * np.sin(2 * np.pi * 1.2 * t) + np.random.normal(0, jitter, num_samples)
         phase = 2 * np.pi * np.cumsum(pitch_contour) / sr
         
-        # Harmonic series with formant envelope (Formants around 500Hz, 1500Hz, 2500Hz)
+        # Natural vocal tract formants (steep roll-off above 3kHz)
         waveform = (
-            1.0 * np.sin(phase) +
-            0.6 * np.sin(2 * phase) +
-            0.4 * np.sin(3 * phase) +
-            0.2 * np.sin(4 * phase) +
-            0.1 * np.sin(5 * phase)
+            1.00 * np.sin(phase) +
+            0.65 * np.sin(2 * phase) +
+            0.40 * np.sin(3 * phase) +
+            0.20 * np.sin(4 * phase) +
+            0.08 * np.sin(5 * phase) +
+            0.02 * np.sin(6 * phase)
         )
-        # Add natural breathiness / room noise
-        waveform += np.random.normal(0, 0.02, num_samples)
+        # Soft room ambiance (low frequency)
+        waveform += np.random.normal(0, 0.005, num_samples)
     else:
         # Synthetic / AI cloned voice simulation
-        # Flat pitch contour, unnaturally sharp harmonics, high-frequency vocoder hiss
+        # Flat pitch contour, unnaturally prominent upper harmonics, neural vocoder dispersion
         phase = 2 * np.pi * fundamental_freq * t
         waveform = (
-            1.0 * np.sin(phase) +
-            0.8 * np.sin(2 * phase) +
-            0.7 * np.sin(3 * phase) +
-            0.6 * np.sin(4 * phase) +
-            0.5 * np.sin(5 * phase) +
-            0.4 * np.sin(6 * phase)
+            0.80 * np.sin(phase) +
+            0.75 * np.sin(2 * phase) +
+            0.70 * np.sin(3 * phase) +
+            0.65 * np.sin(4 * phase) +
+            0.60 * np.sin(5 * phase) +
+            0.55 * np.sin(6 * phase) +
+            0.50 * np.sin(7 * phase)
         )
-        # High-frequency vocoder phase artifacts (4kHz-7kHz)
-        hf_noise = np.sin(2 * np.pi * 5500 * t) * 0.15 + np.sin(2 * np.pi * 6500 * t) * 0.12
-        waveform += hf_noise
+        # Neural vocoder high-frequency checkerboard / unvoiced dispersion (4.5kHz - 7.5kHz)
+        hf_vocoder = (
+            0.35 * np.sin(2 * np.pi * 4800 * t) +
+            0.30 * np.sin(2 * np.pi * 5600 * t) +
+            0.25 * np.sin(2 * np.pi * 6800 * t) +
+            0.20 * np.random.normal(0, 0.1, num_samples)
+        )
+        waveform += hf_vocoder
 
     # Normalize to [-0.8, 0.8]
     waveform = waveform / (np.max(np.abs(waveform)) + 1e-6) * 0.8
@@ -60,7 +66,8 @@ def generate_voice_sample(
 
 
 def main():
-    output_dir = Path("./samples")
+    script_dir = Path(__file__).resolve().parent
+    output_dir = script_dir.parent / "samples"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     samples = {

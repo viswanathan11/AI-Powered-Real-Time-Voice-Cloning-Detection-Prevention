@@ -40,10 +40,10 @@ def run_demo():
         org_id="org_enterprise_01",
         audio_samples_b64=cfo_samples
     )
-    print(f"  ✓ Enrolled Profile ID: {profile.profile_id}")
-    print(f"  ✓ Name: {profile.person_name} | Role: {profile.role}")
-    print(f"  ✓ Averaged Embedding Dimension: {len(profile.embedding)} (192-d ECAPA-TDNN)")
-    print(f"  ✓ Privacy: Raw audio samples discarded. Reference vector enrolled.\n")
+    print(f"  [+] Enrolled Profile ID: {profile.profile_id}")
+    print(f"  [+] Name: {profile.person_name} | Role: {profile.role}")
+    print(f"  [+] Averaged Embedding Dimension: {len(profile.embedding)} (192-d ECAPA-TDNN)")
+    print(f"  [+] Privacy: Raw audio samples discarded. Reference vector enrolled.\n")
 
     time.sleep(0.5)
 
@@ -58,12 +58,12 @@ def run_demo():
         audio_b64=genuine_chunk,
         compare_to_profile_id=profile.profile_id
     )
-    print(f"  • Speaker Match Score: {result_genuine['speakerMatchScore'] * 100:.1f}%")
-    print(f"  • Synthetic Artifacts: {result_genuine['syntheticScore'] * 100:.1f}%")
-    print(f"  • Running Risk Score:  {result_genuine['runningRisk'] * 100:.1f}%")
-    print(f"  • Risk Level:          [{result_genuine['riskLevel']}]")
-    print(f"  • Recommendation:      {result_genuine['recommendation']}")
-    print(f"  • Latency:             {result_genuine['latencyMs']} ms")
+    print(f"  * Speaker Match Score: {result_genuine['speakerMatchScore'] * 100:.1f}%")
+    print(f"  * Synthetic Artifacts: {result_genuine['syntheticScore'] * 100:.1f}%")
+    print(f"  * Running Risk Score:  {result_genuine['runningRisk'] * 100:.1f}%")
+    print(f"  * Risk Level:          [{result_genuine['riskLevel']}]")
+    print(f"  * Recommendation:      {result_genuine['recommendation']}")
+    print(f"  * Latency:             {result_genuine['latencyMs']} ms")
     print("  --> Result: Call verified genuine. Normal workflow approved.\n")
 
     time.sleep(0.5)
@@ -79,12 +79,12 @@ def run_demo():
         audio_b64=clone_chunk,
         compare_to_profile_id=profile.profile_id
     )
-    print(f"  • Speaker Match Score: {result_clone['speakerMatchScore'] * 100:.1f}%")
-    print(f"  • Synthetic Artifacts: {result_clone['syntheticScore'] * 100:.1f}% (CRITICAL ANOMALY)")
-    print(f"  • Running Risk Score:  {result_clone['runningRisk'] * 100:.1f}%")
-    print(f"  • Risk Level:          [{result_clone['riskLevel']}]")
-    print(f"  • Recommendation:      *** {result_clone['recommendation']} ***")
-    print(f"  • Latency:             {result_clone['latencyMs']} ms")
+    print(f"  * Speaker Match Score: {result_clone['speakerMatchScore'] * 100:.1f}%")
+    print(f"  * Synthetic Artifacts: {result_clone['syntheticScore'] * 100:.1f}% (CRITICAL ANOMALY)")
+    print(f"  * Running Risk Score:  {result_clone['runningRisk'] * 100:.1f}%")
+    print(f"  * Risk Level:          [{result_clone['riskLevel']}]")
+    print(f"  * Recommendation:      *** {result_clone['recommendation']} ***")
+    print(f"  * Latency:             {result_clone['latencyMs']} ms")
     print("  --> ALERT FIRED: AI voice cloning detected! Call flagged for callback verification.\n")
 
     time.sleep(0.5)
@@ -100,12 +100,12 @@ def run_demo():
         audio_b64=attacker_chunk,
         compare_to_profile_id=profile.profile_id
     )
-    print(f"  • Speaker Match Score: {result_attacker['speakerMatchScore'] * 100:.1f}% (SPEAKER MISMATCH)")
-    print(f"  • Synthetic Artifacts: {result_attacker['syntheticScore'] * 100:.1f}%")
-    print(f"  • Running Risk Score:  {result_attacker['runningRisk'] * 100:.1f}%")
-    print(f"  • Risk Level:          [{result_attacker['riskLevel']}]")
-    print(f"  • Recommendation:      *** {result_attacker['recommendation']} ***")
-    print(f"  • Latency:             {result_attacker['latencyMs']} ms")
+    print(f"  * Speaker Match Score: {result_attacker['speakerMatchScore'] * 100:.1f}% (SPEAKER MISMATCH)")
+    print(f"  * Synthetic Artifacts: {result_attacker['syntheticScore'] * 100:.1f}%")
+    print(f"  * Running Risk Score:  {result_attacker['runningRisk'] * 100:.1f}%")
+    print(f"  * Risk Level:          [{result_attacker['riskLevel']}]")
+    print(f"  * Recommendation:      *** {result_attacker['recommendation']} ***")
+    print(f"  * Latency:             {result_attacker['latencyMs']} ms")
     print("  --> ALERT FIRED: Caller voice does not match enrolled executive voiceprint.\n")
 
     print("=" * 70)

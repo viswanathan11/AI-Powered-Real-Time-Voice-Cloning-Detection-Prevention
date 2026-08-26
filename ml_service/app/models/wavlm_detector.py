@@ -54,38 +54,43 @@ class AcousticArtifactAnalyzer:
         diff_spec = np.diff(fft_specs, axis=0)
         spectral_flux = float(np.mean(np.maximum(0, diff_spec)))
 
-        # 3. High-Frequency Band (>4kHz in 16kHz audio = bins above n_fft/4)
-        hf_start_bin = n_fft // 4
+        # 3. High-Frequency Band Analysis (>3.8kHz in 16kHz audio)
+        hf_start_bin = int((n_fft // 2 + 1) * 3800 / (sample_rate / 2))
         hf_spec = fft_specs[:, hf_start_bin:]
         
-        # Spectral Flatness in high frequency (ratio of geometric mean to arithmetic mean)
-        geom_mean = np.exp(np.mean(np.log(hf_spec + 1e-8), axis=1))
-        arith_mean = np.mean(hf_spec, axis=1) + 1e-8
-        hf_flatness = float(np.mean(geom_mean / arith_mean))
-
-        # High frequency energy ratio and variance
         hf_energy = np.sum(hf_spec ** 2, axis=1)
         total_energy = np.sum(fft_specs ** 2, axis=1) + 1e-8
         hf_ratio = float(np.mean(hf_energy / total_energy))
-        hf_variance = float(np.var(hf_energy / total_energy))
 
-        # 4. Energy smoothness / micro-tremor
-        frame_energies = np.sum(stft_matrix ** 2, axis=1)
-        energy_diffs = np.abs(np.diff(frame_energies))
-        energy_smoothness = float(np.std(energy_diffs) / (np.mean(energy_diffs) + 1e-8))
+        # High frequency spectral flatness (ratio of geometric mean to arithmetic mean)
+        log_hf = np.log(hf_spec + 1e-8)
+        geom_mean = np.exp(np.mean(log_hf, axis=1))
+        arith_mean = np.mean(hf_spec, axis=1) + 1e-8
+        hf_flatness = float(np.mean(geom_mean / arith_mean))
 
-        # Composite heuristic vocoder artifact score
-        # Neural vocoders typically show higher HF energy variance and flatness anomalies
+        # 4. Spectral Roll-off (85% energy frequency)
+        cumsum_energy = np.cumsum(fft_specs ** 2, axis=1)
+        total_e = cumsum_energy[:, -1:] + 1e-8
+        rolloff_bins = np.argmax(cumsum_energy >= 0.85 * total_e, axis=1)
+        avg_rolloff_freq = float(np.mean(rolloff_bins)) * (sample_rate / 2) / (n_fft // 2 + 1)
+
+        # Calibrated vocoder anomaly score:
+        # Genuine human speech exhibits steep spectral roll-off above 3.5kHz (hf_ratio < 0.05).
+        # Neural vocoders (HiFi-GAN, MelGAN) generate unvoiced noise & checkerboard artifacts above 4kHz.
+        hf_ratio_score = float(np.clip((hf_ratio - 0.03) / 0.18, 0.0, 1.0))
+        flatness_score = float(np.clip((hf_flatness - 0.10) / 0.45, 0.0, 1.0))
+        rolloff_score = float(np.clip((avg_rolloff_freq - 2500) / 3200, 0.0, 1.0))
+
         vocoder_score = float(np.clip(
-            (hf_flatness * 1.8 + hf_variance * 25.0 + min(spectral_flux, 1.0) * 0.4),
+            0.45 * hf_ratio_score + 0.35 * flatness_score + 0.20 * rolloff_score,
             0.0, 1.0
         ))
 
         return {
             "spectral_flux": round(min(spectral_flux, 1.0), 4),
-            "high_freq_irregularity": round(min(hf_variance * 10.0, 1.0), 4),
-            "spectral_flatness_hf": round(min(hf_flatness, 1.0), 4),
-            "prosody_unnaturalness": round(min(energy_smoothness * 0.2, 1.0), 4),
+            "high_freq_ratio": round(hf_ratio, 4),
+            "spectral_flatness_hf": round(hf_flatness, 4),
+            "spectral_rolloff_hz": round(avg_rolloff_freq, 1),
             "vocoder_artifact_score": round(vocoder_score, 4)
         }
 
