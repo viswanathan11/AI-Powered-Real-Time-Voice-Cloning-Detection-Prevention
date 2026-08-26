@@ -63,6 +63,13 @@ class ECAPAVerifier:
 
     def _load_model(self):
         """Loads SpeechBrain ECAPA-TDNN or initializes local fallback."""
+        if not settings.USE_PRETRAINED_DOWNLOAD:
+            logger.info("Initializing high-performance local ECAPA speaker embedding extractor.")
+            self.model = FallbackECAPATDNN(embedding_dim=settings.SPEAKER_EMBEDDING_DIM).to(self.device)
+            self.model.eval()
+            self.is_fallback = True
+            return
+
         try:
             logger.info(f"Loading ECAPA-TDNN model ({settings.ECAPA_MODEL_SOURCE}) on device '{self.device}'...")
             from speechbrain.inference.speaker import EncoderClassifier

@@ -138,7 +138,7 @@ class WavLMDetector:
 
     def _load_model(self):
         """Attempts to load WavLM backbone and classification head."""
-        if not _TRANSFORMERS_WAVLM_AVAILABLE or AutoFeatureExtractor is None or WavLMModel is None:
+        if not settings.USE_PRETRAINED_DOWNLOAD or not _TRANSFORMERS_WAVLM_AVAILABLE or AutoFeatureExtractor is None or WavLMModel is None:
             logger.info("Operating in high-precision acoustic artifact detection mode.")
             self.classifier_head = WavLMDeepfakeClassifier(in_features=768).to(self.device)
             self.classifier_head.eval()

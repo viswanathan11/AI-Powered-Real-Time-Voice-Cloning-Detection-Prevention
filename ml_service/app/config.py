@@ -25,6 +25,8 @@ class Settings(BaseModel):
     DEVICE: str = os.getenv("DEVICE", "cuda" if os.getenv("USE_CUDA", "false").lower() == "true" else "cpu")
     
     # Model Configurations
+    USE_PRETRAINED_DOWNLOAD: bool = os.getenv("USE_PRETRAINED_DOWNLOAD", "false").lower() in ("true", "1", "yes")
+
     # Speaker Verification (ECAPA-TDNN)
     ECAPA_MODEL_SOURCE: str = os.getenv("ECAPA_MODEL_SOURCE", "speechbrain/spkrec-ecapa-voxceleb")
     ECAPA_SAVEDIR: Path = Path(os.getenv("ECAPA_SAVEDIR", "./models/checkpoints/ecapa_tdnn"))
