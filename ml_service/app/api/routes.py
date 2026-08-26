@@ -1,4 +1,6 @@
-from typing import List
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 
 from app.config import settings
@@ -10,17 +12,80 @@ from app.api.schemas import (
     ExtractEmbeddingResponse,
     EnrollProfileRequest,
     VoiceProfileResponse,
+    VoiceProfileListResponse,
     VerifySpeakerRequest,
     VerifySpeakerResponse,
     DetectSyntheticRequest,
     DetectSyntheticResponse,
+    StartSessionRequest,
+    StartSessionResponse,
     HealthResponse
 )
 from app.services.analysis_service import analysis_service
 from app.services.profile_store import profile_store
 from app.models.model_manager import model_manager
 
-router = APIRouter(tags=["ML Voice Analysis & Verification"])
+router = APIRouter(tags=["Voice Analysis, Verification & Sessions"])
+
+
+# ============================================================================
+# Session & Voiceprint Endpoints (Frontend API)
+# ============================================================================
+
+@router.get(
+    "/voiceprints",
+    response_model=List[VoiceProfileResponse],
+    summary="List all enrolled voiceprints",
+    description="Returns a JSON list of all enrolled voiceprint profiles."
+)
+async def list_voiceprints() -> List[VoiceProfileResponse]:
+    profiles = profile_store.list_profiles()
+    return [VoiceProfileResponse(**p.to_dict(include_embedding=False)) for p in profiles]
+
+
+@router.get(
+    "/voiceprint/profiles",
+    response_model=VoiceProfileListResponse,
+    summary="List all enrolled voiceprints (Frontend contract)",
+    description="Returns a paginated list of all enrolled voiceprint profiles."
+)
+async def list_voiceprints_paginated() -> VoiceProfileListResponse:
+    profiles = profile_store.list_profiles()
+    profile_responses = [VoiceProfileResponse(**p.to_dict(include_embedding=False)) for p in profiles]
+    return VoiceProfileListResponse(
+        profiles=profile_responses,
+        total=len(profile_responses)
+    )
+
+
+@router.post(
+    "/voiceprint/enroll",
+    response_model=VoiceProfileResponse,
+    summary="Enroll a genuine voiceprint profile (alias)"
+)
+async def enroll_voiceprint_alias(request: EnrollProfileRequest) -> VoiceProfileResponse:
+    return await enroll_profile(request)
+
+
+@router.post(
+    "/session/start",
+    response_model=StartSessionResponse,
+    summary="Start a live audio streaming session",
+    description="Initializes a new live audio monitoring session for a target voiceprint."
+)
+async def start_session(request: StartSessionRequest) -> StartSessionResponse:
+    session_id = f"sess_{uuid.uuid4().hex[:12]}"
+    target_profile_id = request.profileId or request.claimedIdentity
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return StartSessionResponse(
+        sessionId=session_id,
+        status="STARTED",
+        profileId=target_profile_id,
+        websocketUrl=f"ws://localhost:8000/ws/session/{session_id}",
+        startedAt=now_iso
+    )
+
+
 
 
 @router.post(

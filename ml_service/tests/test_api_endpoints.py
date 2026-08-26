@@ -138,6 +138,38 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertIn("isSynthetic", data)
         self.assertIn("details", data)
 
+    def test_get_voiceprints_api(self):
+        # 1. Enroll a test profile
+        samples = [self._generate_b64_audio(freq=220.0, duration=1.0)]
+        self.client.post("/api/enroll-profile", json={
+            "personName": "Test Executive",
+            "role": "CEO",
+            "audioSamples": samples
+        })
+
+        # 2. Call GET /api/voiceprints
+        response = self.client.get("/api/voiceprints")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, list)
+        self.assertGreaterEqual(len(data), 1)
+        self.assertEqual(data[0]["personName"], "Test Executive")
+        self.assertEqual(data[0]["role"], "CEO")
+
+    def test_start_session_api(self):
+        payload = {
+            "profileId": "vp_test123456",
+            "context": {"callType": "HIGH_VALUE_WIRE"}
+        }
+        response = self.client.post("/api/session/start", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("sessionId", data)
+        self.assertTrue(data["sessionId"].startswith("sess_"))
+        self.assertEqual(data["status"], "STARTED")
+        self.assertEqual(data["profileId"], "vp_test123456")
+        self.assertIn("startedAt", data)
+
     def test_invalid_audio_returns_400(self):
         response = self.client.post("/ml/analyze-chunk", json={"audio": "not_valid_base64!!!"})
         self.assertEqual(response.status_code, 400)
@@ -145,3 +177,4 @@ class TestAPIEndpoints(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

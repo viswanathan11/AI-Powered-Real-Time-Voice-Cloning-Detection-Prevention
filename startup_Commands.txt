@@ -1,0 +1,35 @@
+===================================================
+PART 1: START THE PYTHON BACKEND (ML SERVICE)
+===================================================
+Open a terminal in the main project folder.
+
+1. Activate the Python virtual environment:
+.\venv\Scripts\activate
+
+2. Install any missing dependencies:
+pip install -r requirements.txt
+
+3. Start the FastAPI server:
+python ml_service/scripts/run_server.py
+
+(Your backend is now running! View the API docs at http://localhost:8000/docs)
+
+
+===================================================
+PART 2: CREATE & START THE REACT FRONTEND
+===================================================
+Open a NEW, second terminal window in the main project folder.
+
+1. Generate the React project folder (only run this once!):
+npm create vite@latest frontend -- --template react
+
+2. Move into the new frontend folder:
+cd frontend
+
+3. Install all the necessary Node modules:
+npm install
+
+4. Start the Frontend development server:
+npm run dev
+
+(Your React website will be running at http://localhost:5173)
