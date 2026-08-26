@@ -1,6 +1,12 @@
 import unittest
 import torch
 import numpy as np
+import sys
+from pathlib import Path
+
+ml_service_dir = Path(__file__).resolve().parent.parent
+if str(ml_service_dir) not in sys.path:
+    sys.path.insert(0, str(ml_service_dir))
 
 from app.models.wavlm_detector import WavLMDetector, AcousticArtifactAnalyzer
 

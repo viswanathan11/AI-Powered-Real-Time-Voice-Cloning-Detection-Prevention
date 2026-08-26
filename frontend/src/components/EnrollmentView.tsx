@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { VoiceProfile, EnrollVoiceprintRequest } from '../types';
 import { api } from '../services/api';
 import { getDemoAudioPayloads } from '../data/demoAudio';
@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Fingerprint,
   ShieldCheck,
-  FileAudio,
 } from 'lucide-react';
 
 interface EnrollmentViewProps {
@@ -78,7 +77,6 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
 
       await audioCaptureEngine.startMicrophone({
         onChunkReady: (chunk) => {
-          // Stop after 1 chunk (3 seconds)
           audioCaptureEngine.stop();
           setIsRecording(false);
           setRecordingIndex(null);
@@ -151,7 +149,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
 
       const profile = await api.enrollVoiceprint(req);
       setSuccessMessage(
-        `✓ Voiceprint successfully enrolled for "${profile.personName}" (${profile.role})! Profile ID: ${profile.profileId}. Numerical 192-d embedding saved.`
+        `✓ Voiceprint successfully enrolled for "${profile.personName}" (${profile.role})! Numerical 192-d embedding saved.`
       );
       setAudioSamples([]);
       await onRefreshProfiles();
@@ -176,65 +174,62 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Privacy Guarantee Banner (SIH Requirement #4) */}
-      <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 rounded-2xl p-5 shadow-2xl backdrop-blur-md">
-        <div className="flex items-start space-x-4">
-          <div className="p-3 bg-emerald-500/20 border border-emerald-500/40 rounded-xl shrink-0">
-            <Lock className="w-8 h-8 text-emerald-400" />
+    <div className="space-y-5">
+      {/* Clean Privacy Assurance Banner */}
+      <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-2.5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400 shrink-0">
+            <Lock className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-xs px-2.5 py-0.5 rounded bg-emerald-500/30 font-bold uppercase tracking-wider text-emerald-300">
-                Privacy &amp; Regulatory Compliance Module
+              <span className="text-xs font-bold text-white">
+                Zero Raw Voice Storage (DPDP &amp; GDPR Compliant)
               </span>
-              <span className="text-xs text-slate-400 font-mono">SIH26104 Mandate #4</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono">
+                Mandate #4
+              </span>
             </div>
-            <h3 className="text-lg font-bold text-white mt-1">
-              Zero Raw Voice Retention — 192-Dimensional Feature-Only Storage
-            </h3>
-            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-              To protect executive confidentiality and comply with the <strong>Indian Digital Personal Data Protection (DPDP) Act</strong> and <strong>GDPR</strong>, this system <strong>never stores raw voice audio recordings</strong> in the database. During enrollment, the ECAPA-TDNN neural network instantly extracts a 192-dimensional numerical vector and permanently discards the raw audio.
+            <p className="text-xs text-slate-400 mt-0.5">
+              ECAPA-TDNN extracts 192-d mathematical embeddings and permanently deletes raw voice audio.
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLoadDemoSamples}
+          disabled={loading || isRecording}
+          className="shrink-0 px-3.5 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-semibold text-xs rounded-xl transition flex items-center space-x-1.5 cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Load Demo CFO Clips</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column: Enrollment Form (7 cols) */}
-        <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl flex flex-col justify-between space-y-4">
           <div>
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
-                  <UserPlus className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">Enroll New Executive Voiceprint</h3>
-                  <p className="text-xs text-slate-400">Record 1-3 voice clips to generate reference biometric voiceprint</p>
-                </div>
+            <div className="flex items-center space-x-2.5 pb-3 mb-4 border-b border-slate-800/70">
+              <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400">
+                <UserPlus className="w-4 h-4" />
               </div>
-
-              <button
-                type="button"
-                onClick={handleLoadDemoSamples}
-                disabled={loading || isRecording}
-                className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-semibold text-xs rounded-lg transition flex items-center space-x-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Load Authentic CFO Clips</span>
-              </button>
+              <div>
+                <h3 className="text-sm font-bold text-white">Enroll Executive Voiceprint</h3>
+                <p className="text-xs text-slate-400">Record 1-3 voice clips to generate biometric voiceprint</p>
+              </div>
             </div>
 
             {/* Notification Messages */}
             {successMessage && (
-              <div className="p-3 mb-4 bg-emerald-950/60 border border-emerald-500/60 rounded-xl text-xs text-emerald-200 flex items-center space-x-2">
+              <div className="p-3 mb-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-xs text-emerald-200 flex items-center space-x-2">
                 <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>{successMessage}</span>
               </div>
             )}
             {errorMessage && (
-              <div className="p-3 mb-4 bg-rose-950/60 border border-rose-500/60 rounded-xl text-xs text-rose-200">
+              <div className="p-3 mb-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-xs text-rose-200">
                 {errorMessage}
               </div>
             )}
@@ -243,7 +238,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* Name */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  <label className="text-[11px] font-medium text-slate-400 block mb-1">
                     Person Name *
                   </label>
                   <input
@@ -251,44 +246,44 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                     required
                     value={personName}
                     onChange={(e) => setPersonName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950/60 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
                     placeholder="e.g. Ramesh Kumar"
                   />
                 </div>
 
                 {/* Role */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  <label className="text-[11px] font-medium text-slate-400 block mb-1">
                     Executive Role
                   </label>
                   <input
                     type="text"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
-                    placeholder="e.g. CFO / CEO"
+                    className="w-full bg-slate-950/60 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    placeholder="e.g. CFO"
                   />
                 </div>
 
                 {/* Org ID */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  <label className="text-[11px] font-medium text-slate-400 block mb-1">
                     Organization ID
                   </label>
                   <input
                     type="text"
                     value={orgId}
                     onChange={(e) => setOrgId(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-950/60 border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
                     placeholder="e.g. org_bank_01"
                   />
                 </div>
               </div>
 
               {/* 3 Voice Samples Capture Section */}
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-white">
+                  <label className="text-xs font-semibold text-slate-300">
                     Voice Sample Clips (3-second 16kHz WAVs):
                   </label>
                   <span className="text-[11px] font-mono text-slate-400">
@@ -296,7 +291,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {[0, 1, 2].map((idx) => {
                     const hasSample = !!audioSamples[idx];
                     const isRecThis = isRecording && recordingIndex === idx;
@@ -304,50 +299,50 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                     return (
                       <div
                         key={idx}
-                        className={`p-3.5 rounded-xl border flex flex-col justify-between space-y-3 transition ${
+                        className={`p-3 rounded-xl border flex flex-col justify-between space-y-2.5 transition ${
                           hasSample
-                            ? 'bg-emerald-950/20 border-emerald-500/50'
-                            : 'bg-slate-950/60 border-slate-800'
+                            ? 'bg-emerald-950/20 border-emerald-500/40'
+                            : 'bg-slate-950/50 border-slate-800/80'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-300">
+                          <span className="text-xs font-semibold text-slate-300">
                             Clip #{idx + 1}
                           </span>
                           {hasSample ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
-                              ✓ Captured
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                              ✓ Ready
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-500 font-mono">
-                              Pending
+                              Empty
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1.5">
                           {!isRecThis ? (
                             <button
                               type="button"
                               onClick={() => startRecordingClip(idx)}
                               disabled={isRecording || loading}
-                              className="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold rounded-lg transition flex items-center justify-center space-x-1"
+                              className="flex-1 py-1.5 px-2 bg-slate-800/80 hover:bg-slate-700 text-cyan-300 text-xs font-medium rounded-lg transition flex items-center justify-center space-x-1 cursor-pointer"
                             >
-                              <Mic className="w-3.5 h-3.5" />
+                              <Mic className="w-3 h-3" />
                               <span>{hasSample ? 'Re-Record' : 'Record'}</span>
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={stopRecordingClip}
-                              className="flex-1 py-1.5 px-2 bg-red-600 text-white text-xs font-bold rounded-lg animate-pulse flex items-center justify-center space-x-1"
+                              className="flex-1 py-1.5 px-2 bg-red-600 text-white text-xs font-bold rounded-lg animate-pulse flex items-center justify-center space-x-1 cursor-pointer"
                             >
-                              <Square className="w-3.5 h-3.5" />
+                              <Square className="w-3 h-3" />
                               <span>Recording...</span>
                             </button>
                           )}
 
-                          <label className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer transition">
+                          <label className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer transition">
                             <Upload className="w-3.5 h-3.5" />
                             <input
                               type="file"
@@ -364,16 +359,16 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
               </div>
 
               {/* Submit Button */}
-              <div className="pt-3">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={loading || isRecording}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-sm"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Fingerprint className="w-5 h-5" />
+                    <Fingerprint className="w-4 h-4" />
                   )}
                   <span>EXTRACT 192-D EMBEDDING &amp; ENROLL PROFILE</span>
                 </button>
@@ -383,20 +378,20 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
         </div>
 
         {/* Right Column: Enrolled Profiles Directory (5 cols) */}
-        <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur-md flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl flex flex-col justify-between space-y-4">
           <div>
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800/70">
               <div className="flex items-center space-x-2">
-                <UserCheck className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">Registered Executive Profiles</h3>
+                <UserCheck className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Registered Executive Profiles</h3>
               </div>
               <button
                 type="button"
                 onClick={() => onRefreshProfiles()}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
                 title="Refresh Profile List"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -405,39 +400,35 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                 No voice profiles enrolled yet. Complete the form to register an executive.
               </div>
             ) : (
-              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
                 {profiles.map((p) => (
                   <div
                     key={p.profileId}
-                    className="p-3.5 bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl transition"
+                    className="p-3 bg-slate-950/60 border border-slate-800/80 hover:border-slate-700/80 rounded-xl transition"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="text-sm font-bold text-white">{p.personName}</h4>
-                        <p className="text-xs text-cyan-400 font-semibold">{p.role || 'Executive'}</p>
+                        <h4 className="text-xs font-bold text-white">{p.personName}</h4>
+                        <p className="text-[11px] text-cyan-400">{p.role || 'Executive'}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleDeleteProfile(p.profileId)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                        className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer"
                         title="Delete Profile"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-slate-900 text-[11px] font-mono text-slate-400">
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-900 text-[10px] font-mono text-slate-400">
                       <div>
-                        <span>Profile ID:</span>
-                        <div className="text-slate-300 font-bold truncate">{p.profileId}</div>
+                        <span>Samples:</span>
+                        <div className="text-emerald-400 font-semibold">{p.sampleCount} clips (192-d)</div>
                       </div>
                       <div>
-                        <span>Samples Averaged:</span>
-                        <div className="text-emerald-400 font-bold">{p.sampleCount} clips (192-d)</div>
-                      </div>
-                      <div className="col-span-2">
                         <span>Enrolled:</span>
-                        <div className="text-slate-400">{new Date(p.enrolledAt).toLocaleString()}</div>
+                        <div className="text-slate-400">{new Date(p.enrolledAt).toLocaleDateString()}</div>
                       </div>
                     </div>
                   </div>
@@ -446,11 +437,11 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500 font-mono">
-            <span>Total Enrolled: {profiles.length}</span>
+          <div className="pt-2 border-t border-slate-800/70 flex items-center justify-between text-xs text-slate-500 font-mono">
+            <span>Total: {profiles.length} Profiles</span>
             <span className="text-emerald-400 flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Biometric Vault Active</span>
+              <span>Vault Active</span>
             </span>
           </div>
         </div>
@@ -458,3 +449,4 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
     </div>
   );
 };
+

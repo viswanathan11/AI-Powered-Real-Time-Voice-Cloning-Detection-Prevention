@@ -2,18 +2,18 @@
 
 @layer base {
   body {
-    @apply bg-[#060911] text-slate-100 antialiased font-sans overflow-x-hidden;
+    @apply bg-[#070b14] text-slate-100 antialiased font-sans overflow-x-hidden selection:bg-cyan-500/30 selection:text-cyan-200;
   }
 }
 
 /* Custom scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -28,12 +28,12 @@
 /* Custom glowing and pulse effects */
 @keyframes cyberGlow {
   0%, 100% {
-    opacity: 0.4;
+    opacity: 0.3;
     transform: scale(1);
   }
   50% {
-    opacity: 0.8;
-    transform: scale(1.05);
+    opacity: 0.6;
+    transform: scale(1.03);
   }
 }
 
@@ -41,27 +41,19 @@
   animation: cyberGlow 3s ease-in-out infinite;
 }
 
-@keyframes scanline {
-  0% {
-    transform: translateY(-100%);
+/* Smooth fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
-  100% {
-    transform: translateY(1000%);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-.scanline-effect {
-  position: relative;
-  overflow: hidden;
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.scanline-effect::after {
-  content: " ";
-  display: block;
-  position: absolute;
-  top: 0; left: 0; bottom: 0; right: 0;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-  z-index: 2;
-  background-size: 100% 2px, 3px 100%;
-  pointer-events: none;
-}

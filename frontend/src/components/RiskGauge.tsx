@@ -15,93 +15,75 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
   recommendation,
   isStreaming = false,
 }) => {
-  // Clamp risk score to [0, 1]
   const clampedScore = Math.max(0, Math.min(1, riskScore));
   const percentage = Math.round(clampedScore * 100);
 
   // SVG Gauge Arc Geometry
-  const size = 280;
-  const strokeWidth = 22;
+  const size = 220;
+  const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
-  // Semi-circle from -180 deg (left) to 0 deg (right) = 180 degrees total
   const arcLength = Math.PI * radius;
   const strokeDashoffset = arcLength * (1 - clampedScore);
-
-  // Needle angle: -180 deg (0% risk) to 0 deg (100% risk)
   const needleAngle = -180 + clampedScore * 180;
 
-  // Dynamic Theme Colors based on Task List:
-  // 0.0 - 0.3: GREEN (Safe)
-  // 0.3 - 0.7: YELLOW (Monitor)
-  // 0.7 - 1.0: RED (Critical Risk - Likely Voice Clone)
   let statusColor = '#10B981'; // Green
-  let statusBg = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
-  let glowColor = 'rgba(16, 185, 129, 0.4)';
-  let statusIcon = <ShieldCheck className="w-5 h-5 text-emerald-400" />;
-  let statusLabel = 'SAFE / GENUINE';
+  let statusBg = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+  let glowColor = 'rgba(16, 185, 129, 0.3)';
+  let statusIcon = <ShieldCheck className="w-4 h-4 text-emerald-400" />;
+  let statusLabel = 'Safe / Genuine';
 
   if (clampedScore >= 0.7 || riskLevel === 'CRITICAL' || riskLevel === 'HIGH') {
     statusColor = '#EF4444'; // Red
-    statusBg = 'bg-rose-500/15 border-rose-500/40 text-rose-400';
-    glowColor = 'rgba(239, 68, 68, 0.5)';
-    statusIcon = <Flame className="w-5 h-5 text-rose-400 animate-pulse" />;
-    statusLabel = 'CRITICAL RISK: CLONE';
+    statusBg = 'bg-rose-500/15 border-rose-500/30 text-rose-400';
+    glowColor = 'rgba(239, 68, 68, 0.4)';
+    statusIcon = <Flame className="w-4 h-4 text-rose-400" />;
+    statusLabel = 'Critical Risk: Clone';
   } else if (clampedScore >= 0.3 || riskLevel === 'MEDIUM') {
-    statusColor = '#F59E0B'; // Yellow / Amber
-    statusBg = 'bg-amber-500/15 border-amber-500/40 text-amber-400';
-    glowColor = 'rgba(245, 158, 11, 0.4)';
-    statusIcon = <AlertTriangle className="w-5 h-5 text-amber-400" />;
-    statusLabel = 'MONITOR / SUSPICIOUS';
+    statusColor = '#F59E0B'; // Amber
+    statusBg = 'bg-amber-500/15 border-amber-500/30 text-amber-400';
+    glowColor = 'rgba(245, 158, 11, 0.3)';
+    statusIcon = <AlertTriangle className="w-4 h-4 text-amber-400" />;
+    statusLabel = 'Suspicious: Monitor';
   }
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-2xl relative overflow-hidden backdrop-blur-md">
-      {/* Background ambient glow */}
+    <div className="flex flex-col items-center justify-center p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl relative overflow-hidden">
+      {/* Background subtle glow */}
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full pointer-events-none filter blur-3xl transition-all duration-700 opacity-40"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-36 rounded-full pointer-events-none filter blur-3xl transition-all duration-700 opacity-30"
         style={{ backgroundColor: glowColor }}
       />
 
       {/* Header */}
-      <div className="w-full flex items-center justify-between mb-2 z-10">
-        <div className="flex items-center space-x-2">
-          <ShieldAlert className="w-4 h-4 text-cyan-400" />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Real-Time Risk Scoring Engine
-          </span>
-        </div>
+      <div className="w-full flex items-center justify-between mb-1 z-10">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Risk Score
+        </span>
         {isStreaming && (
-          <span className="flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 animate-pulse">
+          <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-            <span>LIVE SCORING</span>
+            <span>LIVE</span>
           </span>
         )}
       </div>
 
-      {/* SVG Radial Speedometer Gauge */}
-      <div className="relative flex items-center justify-center my-2">
-        <svg width={size} height={size / 2 + 30} viewBox={`0 0 ${size} ${size / 2 + 30}`} className="overflow-visible">
+      {/* SVG Arc Speedometer */}
+      <div className="relative flex items-center justify-center my-1">
+        <svg width={size} height={size / 2 + 20} viewBox={`0 0 ${size} ${size / 2 + 20}`} className="overflow-visible">
           <defs>
-            {/* Multi-stop gradient along the gauge */}
-            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#10B981" />   {/* Green: Safe */}
-              <stop offset="35%" stopColor="#34D399" />
-              <stop offset="55%" stopColor="#FBBF24" />  {/* Yellow: Monitor */}
-              <stop offset="75%" stopColor="#F97316" />
-              <stop offset="100%" stopColor="#EF4444" /> {/* Red: Critical */}
+            <linearGradient id="gaugeGradientClean" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#10B981" />
+              <stop offset="45%" stopColor="#F59E0B" />
+              <stop offset="100%" stopColor="#EF4444" />
             </linearGradient>
-            <filter id="gaugeGlow">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
           </defs>
 
           {/* Background Track Arc */}
           <path
             d={`M ${strokeWidth / 2},${center} A ${radius},${radius} 0 0,1 ${size - strokeWidth / 2},${center}`}
             fill="none"
-            stroke="#1E293B"
+            stroke="#1e293b"
             strokeWidth={strokeWidth}
             strokeLinecap="round"
           />
@@ -110,35 +92,13 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
           <path
             d={`M ${strokeWidth / 2},${center} A ${radius},${radius} 0 0,1 ${size - strokeWidth / 2},${center}`}
             fill="none"
-            stroke="url(#gaugeGradient)"
+            stroke="url(#gaugeGradientClean)"
             strokeWidth={strokeWidth}
             strokeDasharray={arcLength}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            filter="url(#gaugeGlow)"
             className="transition-all duration-500 ease-out"
           />
-
-          {/* Threshold Tick Marks: 0.3 (Safe/Monitor boundary) and 0.7 (Monitor/Critical boundary) */}
-          {/* Tick at 30% */}
-          {(() => {
-            const angle30 = (-180 + 0.3 * 180) * (Math.PI / 180);
-            const x1 = center + (radius - 16) * Math.cos(angle30);
-            const y1 = center + (radius - 16) * Math.sin(angle30);
-            const x2 = center + (radius + 16) * Math.cos(angle30);
-            const y2 = center + (radius + 16) * Math.sin(angle30);
-            return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#64748B" strokeWidth="2" strokeDasharray="2,2" />;
-          })()}
-
-          {/* Tick at 70% */}
-          {(() => {
-            const angle70 = (-180 + 0.7 * 180) * (Math.PI / 180);
-            const x1 = center + (radius - 16) * Math.cos(angle70);
-            const y1 = center + (radius - 16) * Math.sin(angle70);
-            const x2 = center + (radius + 16) * Math.cos(angle70);
-            const y2 = center + (radius + 16) * Math.sin(angle70);
-            return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#64748B" strokeWidth="2" strokeDasharray="2,2" />;
-          })()}
 
           {/* Needle Indicator */}
           <g
@@ -146,54 +106,42 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
             className="transition-transform duration-500 ease-out"
           >
             <polygon
-              points={`${center},${center - 6} ${center - radius + 15},${center} ${center},${center + 6}`}
+              points={`${center},${center - 4} ${center - radius + 12},${center} ${center},${center + 4}`}
               fill={statusColor}
-              filter="drop-shadow(0 0 4px rgba(0,0,0,0.8))"
             />
-            <circle cx={center} cy={center} r="10" fill="#0F172A" stroke={statusColor} strokeWidth="3" />
-            <circle cx={center} cy={center} r="4" fill={statusColor} />
+            <circle cx={center} cy={center} r="7" fill="#0b1120" stroke={statusColor} strokeWidth="2.5" />
           </g>
         </svg>
 
-        {/* Central Numeric Score Display */}
-        <div className="absolute top-28 flex flex-col items-center justify-center pointer-events-none">
+        {/* Central Numeric Score */}
+        <div className="absolute top-20 flex flex-col items-center justify-center pointer-events-none">
           <span
-            className="text-4xl font-extrabold tracking-tight font-mono transition-colors duration-300"
-            style={{ color: statusColor, textShadow: `0 0 20px ${glowColor}` }}
+            className="text-3xl font-extrabold font-mono tracking-tight transition-colors duration-300"
+            style={{ color: statusColor }}
           >
             {percentage}%
           </span>
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">
+          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
             Impersonation Risk
           </span>
         </div>
       </div>
 
-      {/* Threshold Zone Labels */}
-      <div className="w-full flex justify-between px-3 text-[10px] font-mono text-slate-500 -mt-2 mb-3">
-        <span className="text-emerald-400/80">0.0 SAFE</span>
-        <span className="text-amber-400/80">0.3 MONITOR</span>
-        <span className="text-rose-400/80">0.7 CRITICAL</span>
-        <span className="text-rose-500">1.0</span>
+      {/* Threshold Guide */}
+      <div className="w-full flex justify-between px-2 text-[10px] font-mono text-slate-500 -mt-1 mb-2.5">
+        <span className="text-emerald-400/80">0.0 Safe</span>
+        <span className="text-amber-400/80">0.3 Monitor</span>
+        <span className="text-rose-400/80">0.7 Critical</span>
       </div>
 
       {/* Status & Recommendation Card */}
-      <div className={`w-full flex items-center justify-between p-3 rounded-xl border ${statusBg} transition-all duration-300`}>
+      <div className={`w-full flex items-center justify-between p-2.5 rounded-lg border ${statusBg} transition-all duration-300`}>
         <div className="flex items-center space-x-2">
           {statusIcon}
-          <div>
-            <div className="text-xs font-bold uppercase">{statusLabel}</div>
-            <div className="text-[10px] opacity-80">
-              {riskLevel === 'CRITICAL' && 'High synthesis artifacts & voice mismatch'}
-              {riskLevel === 'HIGH' && 'Voiceprint divergence detected'}
-              {riskLevel === 'MEDIUM' && 'Acoustic anomalies present'}
-              {riskLevel === 'LOW' && 'Acoustic spectrum verified authentic'}
-            </div>
-          </div>
+          <div className="text-xs font-semibold">{statusLabel}</div>
         </div>
         <div className="text-right">
-          <span className="text-[10px] uppercase tracking-wider block opacity-70">Protocol</span>
-          <span className="text-xs font-mono font-bold tracking-wider">
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900/60 border border-white/10">
             {recommendation}
           </span>
         </div>
@@ -201,3 +149,4 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
     </div>
   );
 };
+

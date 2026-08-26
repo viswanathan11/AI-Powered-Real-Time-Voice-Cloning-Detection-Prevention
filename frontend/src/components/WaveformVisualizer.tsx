@@ -30,46 +30,30 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     let time = 0;
 
     const render = () => {
-      time += 0.05;
+      time += 0.04;
       const width = canvas.width;
       const height = canvas.height;
 
-      // Clear with dark tech grid background
-      ctx.fillStyle = '#090D16';
+      // Dark background
+      ctx.fillStyle = '#060a13';
       ctx.fillRect(0, 0, width, height);
 
-      // Draw subtle grid lines
-      ctx.strokeStyle = '#1E293B';
-      ctx.lineWidth = 0.5;
-      for (let x = 0; x < width; x += 30) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += 20) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-
-      // Center baseline
-      ctx.strokeStyle = '#334155';
+      // Subtle horizontal centerline
+      ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, height / 2);
       ctx.lineTo(width, height / 2);
       ctx.stroke();
 
-      // Determine waveform color based on risk
-      let strokeColor = '#06B6D4'; // Cyan
+      // Dynamic waveform stroke & glow based on risk
+      let strokeColor = '#06b6d4'; // Cyan
       let glowColor = 'rgba(6, 182, 212, 0.4)';
       if (riskScore >= 0.7) {
-        strokeColor = '#EF4444'; // Red
+        strokeColor = '#ef4444'; // Red
         glowColor = 'rgba(239, 68, 68, 0.5)';
       } else if (riskScore >= 0.3) {
-        strokeColor = '#F59E0B'; // Amber
+        strokeColor = '#f59e0b'; // Amber
         glowColor = 'rgba(245, 158, 11, 0.4)';
       }
 
@@ -80,9 +64,9 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         analyserNode.getByteTimeDomainData(dataArray);
 
         // Draw Oscilloscope Waveform
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2;
         ctx.strokeStyle = strokeColor;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 6;
         ctx.shadowColor = glowColor;
         ctx.beginPath();
 
@@ -90,7 +74,7 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         let x = 0;
 
         for (let i = 0; i < bufferLength; i++) {
-          const v = dataArray[i] / 128.0; // 0.0 to 2.0 (1.0 center)
+          const v = dataArray[i] / 128.0;
           const y = (v * height) / 2;
 
           if (i === 0) {
@@ -105,32 +89,32 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Draw Frequency Spectrum Bars at bottom
+        // Subtle bottom spectrum bars
         const freqArray = new Uint8Array(bufferLength);
         analyserNode.getByteFrequencyData(freqArray);
-        const barWidth = (width / 48);
-        for (let i = 0; i < 48; i++) {
-          const barHeight = (freqArray[i * 2] / 255) * (height * 0.4);
-          ctx.fillStyle = `${strokeColor}44`;
-          ctx.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+        const barWidth = width / 36;
+        for (let i = 0; i < 36; i++) {
+          const barHeight = (freqArray[i * 2] / 255) * (height * 0.35);
+          ctx.fillStyle = `${strokeColor}25`;
+          ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
         }
       } else if (isActive) {
-        // Synthesized animated live wave for scenario playback simulation
-        ctx.lineWidth = 2.5;
+        // Animated live wave for scenario playback
+        ctx.lineWidth = 2;
         ctx.strokeStyle = strokeColor;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 6;
         ctx.shadowColor = glowColor;
         ctx.beginPath();
 
-        const points = 100;
+        const points = 80;
         for (let i = 0; i <= points; i++) {
           const x = (i / points) * width;
-          const amp = Math.max(0.1, rmsLevel * 3.5) * (height * 0.35);
+          const amp = Math.max(0.12, rmsLevel * 3.2) * (height * 0.32);
           const y =
             height / 2 +
-            Math.sin(i * 0.15 + time * 3) * amp * 0.6 +
-            Math.sin(i * 0.3 - time * 2) * amp * 0.3 +
-            (Math.random() - 0.5) * (amp * 0.1);
+            Math.sin(i * 0.18 + time * 3) * amp * 0.6 +
+            Math.sin(i * 0.35 - time * 2) * amp * 0.35 +
+            (Math.random() - 0.5) * (amp * 0.08);
 
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
@@ -138,12 +122,12 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         ctx.stroke();
         ctx.shadowBlur = 0;
       } else {
-        // Idle flatline with subtle breathing animation
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#475569';
+        // Idle gentle breathing wave
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#334155';
         ctx.beginPath();
         for (let x = 0; x < width; x += 10) {
-          const y = height / 2 + Math.sin(x * 0.05 + time) * 1.5;
+          const y = height / 2 + Math.sin(x * 0.04 + time) * 1.5;
           if (x === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -162,56 +146,53 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     };
   }, [analyserNode, isActive, rmsLevel, riskScore]);
 
-  // Format chunk 3s progress
   const progressPercent = Math.min(100, Math.round((chunkProgressSec / 3.0) * 100));
 
   return (
-    <div className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 shadow-inner flex flex-col space-y-2">
-      {/* Visualizer Status Bar */}
+    <div className="w-full bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
+      {/* Top Header */}
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2">
           {isActive ? (
-            <span className="flex items-center space-x-1 text-emerald-400 font-mono">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-              <span className="font-bold text-[11px]">
-                {mode === 'mic' ? 'LIVE MIC (16kHz PCM)' : 'AUDIO STREAM ACTIVE'}
-              </span>
+            <span className="flex items-center space-x-1.5 text-emerald-400 font-mono text-[11px] font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{mode === 'mic' ? 'Live Microphone' : 'Audio Stream Active'}</span>
             </span>
           ) : (
-            <span className="flex items-center space-x-1 text-slate-500 font-mono">
-              <Mic className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-[11px]">STREAM IDLE</span>
+            <span className="flex items-center space-x-1.5 text-slate-500 font-mono text-[11px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+              <span>Awaiting Stream</span>
             </span>
           )}
         </div>
 
         <div className="flex items-center space-x-3 text-[11px] font-mono text-slate-400">
-          <span>SR: <strong>16,000 Hz</strong></span>
-          <span>CH: <strong>1 (Mono)</strong></span>
-          <span>RMS: <strong>{(rmsLevel * 100).toFixed(1)}%</strong></span>
+          <span>16kHz Mono</span>
+          <span className="text-slate-600">•</span>
+          <span>RMS: <strong>{(rmsLevel * 100).toFixed(0)}%</strong></span>
         </div>
       </div>
 
       {/* Canvas */}
-      <div className="relative w-full h-24 rounded-lg overflow-hidden border border-slate-800/80">
-        <canvas ref={canvasRef} width={600} height={100} className="w-full h-full block" />
+      <div className="relative w-full h-20 rounded-lg overflow-hidden border border-slate-800/50 bg-[#060a13]">
+        <canvas ref={canvasRef} width={600} height={80} className="w-full h-full block" />
         {!isActive && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/40 backdrop-blur-[1px] pointer-events-none">
-            <span className="text-xs text-slate-500 font-mono tracking-wider flex items-center space-x-1.5">
-              <Activity className="w-4 h-4 text-slate-600" />
-              <span>Awaiting Audio Capture...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-950/30 pointer-events-none">
+            <span className="text-xs text-slate-500 font-mono flex items-center space-x-1.5">
+              <Activity className="w-3.5 h-3.5 text-slate-600" />
+              <span>Ready for incoming audio</span>
             </span>
           </div>
         )}
       </div>
 
-      {/* 3-Second Chunk Progress Bar */}
+      {/* Chunk Buffer Progress */}
       <div className="space-y-1">
         <div className="flex justify-between text-[10px] font-mono text-slate-400">
-          <span>3.0s Chunk Buffer Window</span>
-          <span>{chunkProgressSec.toFixed(1)}s / 3.0s ({progressPercent}%)</span>
+          <span>3.0s Chunking Window</span>
+          <span>{chunkProgressSec.toFixed(1)}s / 3.0s</span>
         </div>
-        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+        <div className="w-full bg-slate-800/80 h-1 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-100 ease-linear ${
               riskScore >= 0.7 ? 'bg-rose-500' : riskScore >= 0.3 ? 'bg-amber-500' : 'bg-cyan-400'
@@ -223,3 +204,4 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     </div>
   );
 };
+

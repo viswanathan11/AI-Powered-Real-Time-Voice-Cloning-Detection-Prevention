@@ -9,14 +9,10 @@ import {
   Mic,
   FileAudio,
   Radio,
-  UserX,
   UserCheck,
-  AlertTriangle,
-  Play,
   Upload,
-  Layers,
-  Settings,
   Sparkles,
+  Settings2,
 } from 'lucide-react';
 
 interface ThreatSimulatorProps {
@@ -67,7 +63,6 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
   // Simulation timer ref
   const simTimerRef = useRef<number | null>(null);
-  const progressTimerRef = useRef<number | null>(null);
 
   // Synchronize scenario metadata when scenario is changed
   useEffect(() => {
@@ -85,7 +80,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
       const interval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000;
         setStreamDurationSec(elapsed);
-        setChunkProgressSec((elapsed % 3.0));
+        setChunkProgressSec(elapsed % 3.0);
       }, 100);
       return () => clearInterval(interval);
     } else {
@@ -109,7 +104,6 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
       });
 
       if (sourceMode === 'mic') {
-        // Start live microphone stream
         await audioCaptureEngine.startMicrophone({
           onChunkReady: (chunk) => {
             setChunksSentCount((c) => c + 1);
@@ -120,13 +114,11 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           onError: (err) => alert(`Microphone error: ${err.message}`),
         });
       } else if (sourceMode === 'preset') {
-        // Load pre-recorded scenario audio and stream chunk by chunk
         const base64Audio = await getScenarioAudioBase64(selectedScenario.filename);
         const slicedChunks = await audioCaptureEngine.sliceAudioIntoChunks(base64Audio);
 
         let currentIdx = 0;
 
-        // Send first chunk immediately
         if (slicedChunks.length > 0) {
           const first = slicedChunks[0];
           setChunksSentCount(1);
@@ -136,7 +128,6 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           currentIdx = 1;
         }
 
-        // Send subsequent chunks every 3 seconds (real-time chunking simulation)
         simTimerRef.current = window.setInterval(() => {
           if (currentIdx < slicedChunks.length) {
             const nextChunk = slicedChunks[currentIdx];
@@ -146,12 +137,10 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
             onChunkReady(nextChunk);
             currentIdx++;
           } else {
-            // Loop or keep active
             currentIdx = 0;
           }
         }, 3000);
       } else if (sourceMode === 'file') {
-        // Custom file stream
         if (uploadedChunks.length === 0) {
           alert('Please select or upload an audio file (.wav or .mp3) first.');
           await onEndCall();
@@ -194,10 +183,6 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
       clearInterval(simTimerRef.current);
       simTimerRef.current = null;
     }
-    if (progressTimerRef.current) {
-      clearInterval(progressTimerRef.current);
-      progressTimerRef.current = null;
-    }
     audioCaptureEngine.stop();
     await onEndCall();
   };
@@ -218,306 +203,308 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md">
+    <div className="flex flex-col bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl space-y-4">
       {/* Panel Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800/70">
         <div className="flex items-center space-x-2.5">
-          <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-xl">
-            <Radio className="w-5 h-5 text-rose-400" />
+          <div className="p-2 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400">
+            <Radio className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-white tracking-wide flex items-center gap-2">
-              <span>Caller & Threat Simulator</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono border border-rose-500/30">
-                Layer 1: Audio Capture
-              </span>
+            <h2 className="text-sm font-bold text-white tracking-wide">
+              Call &amp; Threat Simulator
             </h2>
             <p className="text-xs text-slate-400">
-              Simulates live incoming telephony/VoIP audio streams sent to backend via WebSockets
+              Simulate live telephony audio &amp; deepfake attack vectors
             </p>
           </div>
         </div>
 
         {isStreaming ? (
-          <span className="flex items-center space-x-2 px-3 py-1 bg-rose-500/20 border border-rose-500/40 rounded-full text-xs font-bold font-mono text-rose-300 animate-pulse">
+          <span className="flex items-center space-x-1.5 px-2.5 py-1 bg-rose-500/15 border border-rose-500/30 rounded-full text-xs font-mono font-medium text-rose-300">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-            <span>CALL IN PROGRESS</span>
+            <span>Streaming</span>
           </span>
         ) : (
-          <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-full text-xs font-mono text-slate-400">
-            DISCONNECTED
+          <span className="px-2.5 py-1 bg-slate-800/60 border border-slate-700/60 rounded-full text-xs font-mono text-slate-400">
+            Idle
           </span>
         )}
       </div>
 
-      {/* Mode Tabs */}
-      <div className="grid grid-cols-3 gap-2 my-4 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      {/* Mode Selector Segmented Tabs */}
+      <div className="grid grid-cols-3 gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
         <button
           type="button"
           disabled={isStreaming}
           onClick={() => setSourceMode('preset')}
-          className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-bold transition ${
+          className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'preset'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 border border-transparent'
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Attack Presets</span>
+          <span>Preset Attacks</span>
         </button>
 
         <button
           type="button"
           disabled={isStreaming}
           onClick={() => setSourceMode('mic')}
-          className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-bold transition ${
+          className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'mic'
-              ? 'bg-cyan-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 border border-transparent'
           }`}
         >
           <Mic className="w-3.5 h-3.5" />
-          <span>Live Microphone</span>
+          <span>Live Mic</span>
         </button>
 
         <button
           type="button"
           disabled={isStreaming}
           onClick={() => setSourceMode('file')}
-          className={`flex items-center justify-center space-x-1.5 py-2 px-3 rounded-lg text-xs font-bold transition ${
+          className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'file'
-              ? 'bg-indigo-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 border border-transparent'
           }`}
         >
           <FileAudio className="w-3.5 h-3.5" />
-          <span>Custom Audio File</span>
+          <span>Audio File</span>
         </button>
       </div>
 
-      {/* Preset Scenario Selector */}
+      {/* Preset Scenario Selector - Clean Horizontal Grid */}
       {sourceMode === 'preset' && (
-        <div className="space-y-2 mb-4">
-          <label className="text-xs font-semibold text-slate-300 block">
-            Select Threat Scenario Preset:
-          </label>
-          <div className="grid grid-cols-1 gap-2">
-            {DEMO_SCENARIOS.map((sc) => (
-              <button
-                key={sc.id}
-                type="button"
-                disabled={isStreaming}
-                onClick={() => setSelectedScenario(sc)}
-                className={`p-3 rounded-xl border text-left transition ${
-                  selectedScenario.id === sc.id
-                    ? sc.category === 'clone_attack'
-                      ? 'bg-rose-950/40 border-rose-500/80 shadow-rose-950/50 ring-1 ring-rose-500'
-                      : sc.category === 'genuine'
-                      ? 'bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500'
-                      : 'bg-amber-950/40 border-amber-500/80 ring-1 ring-amber-500'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">{sc.name}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                      sc.expectedRiskLevel === 'CRITICAL'
-                        ? 'bg-rose-500/20 text-rose-300'
-                        : sc.expectedRiskLevel === 'HIGH'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-emerald-500/20 text-emerald-300'
-                    }`}
-                  >
-                    Expected: {sc.expectedRiskLevel}
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-3 gap-2">
+            {DEMO_SCENARIOS.map((sc) => {
+              const isSelected = selectedScenario.id === sc.id;
+              let activeBorder = 'border-rose-500/60 bg-rose-950/30 text-rose-200';
+              let badgeColor = 'bg-rose-500/20 text-rose-300';
+              if (sc.category === 'genuine') {
+                activeBorder = 'border-emerald-500/60 bg-emerald-950/30 text-emerald-200';
+                badgeColor = 'bg-emerald-500/20 text-emerald-300';
+              } else if (sc.category === 'impersonator') {
+                activeBorder = 'border-amber-500/60 bg-amber-950/30 text-amber-200';
+                badgeColor = 'bg-amber-500/20 text-amber-300';
+              }
+
+              return (
+                <button
+                  key={sc.id}
+                  type="button"
+                  disabled={isStreaming}
+                  onClick={() => setSelectedScenario(sc)}
+                  className={`p-2.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
+                    isSelected
+                      ? `${activeBorder} shadow-sm ring-1 ring-white/10`
+                      : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center space-x-1.5 mb-1.5">
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        sc.category === 'clone_attack'
+                          ? 'bg-rose-500'
+                          : sc.category === 'genuine'
+                          ? 'bg-emerald-400'
+                          : 'bg-amber-400'
+                      }`}
+                    />
+                    <span className="text-xs font-bold truncate">
+                      {sc.category === 'clone_attack'
+                        ? 'AI Clone Attack'
+                        : sc.category === 'genuine'
+                        ? 'Genuine Call'
+                        : 'Impersonator'}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded self-start ${badgeColor}`}>
+                    {sc.expectedRiskLevel}
                   </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">{sc.description}</p>
-              </button>
-            ))}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Selected Scenario Brief */}
+          <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3 text-xs text-slate-300">
+            <p className="line-clamp-2 text-slate-400 text-[11px] leading-relaxed">
+              {selectedScenario.description}
+            </p>
           </div>
         </div>
       )}
 
       {/* Live Mic Info Banner */}
       {sourceMode === 'mic' && (
-        <div className="bg-cyan-950/30 border border-cyan-500/30 rounded-xl p-3.5 mb-4 text-xs text-cyan-200">
-          <div className="flex items-center space-x-2 font-bold mb-1">
-            <Mic className="w-4 h-4 text-cyan-400" />
-            <span>Native Web Audio API Mic Streamer Active</span>
-          </div>
-          <p className="text-[11px] text-slate-300">
-            Records your physical microphone in uncompressed <strong>16kHz Mono 16-bit PCM</strong> without browser compression. Slices live speech into 3-second binary frames.
-          </p>
+        <div className="bg-cyan-950/20 border border-cyan-500/20 rounded-xl p-3 text-xs text-cyan-200 flex items-center space-x-2.5">
+          <Mic className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="text-[11px] text-slate-300 leading-normal">
+            Streaming uncompressed <strong>16kHz Mono 16-bit PCM</strong> from your microphone in 3-second frames.
+          </span>
         </div>
       )}
 
-      {/* Custom Audio File Upload */}
+      {/* File Upload Mode */}
       {sourceMode === 'file' && (
-        <div className="space-y-2 mb-4">
-          <label className="text-xs font-semibold text-slate-300 block">
-            Upload Voice Audio File (.wav or .mp3):
+        <div className="space-y-2">
+          <label className="flex items-center justify-center space-x-2 p-3.5 bg-slate-950/60 border border-dashed border-slate-700/80 hover:border-slate-600 rounded-xl cursor-pointer transition">
+            <Upload className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-mono text-slate-300">
+              {uploadedFileName || 'Choose .wav or .mp3 voice file'}
+            </span>
+            <input
+              type="file"
+              accept="audio/wav, audio/mp3, audio/mpeg, audio/ogg"
+              onChange={handleFileUpload}
+              disabled={isStreaming}
+              className="hidden"
+            />
           </label>
-          <div className="flex items-center space-x-2">
-            <label className="flex-1 flex items-center justify-center space-x-2 p-3 bg-slate-950 border border-dashed border-slate-700 hover:border-slate-500 rounded-xl cursor-pointer transition">
-              <Upload className="w-4 h-4 text-slate-400" />
-              <span className="text-xs font-mono text-slate-300">
-                {uploadedFileName || 'Choose .wav / .mp3 file'}
-              </span>
-              <input
-                type="file"
-                accept="audio/wav, audio/mp3, audio/mpeg, audio/ogg"
-                onChange={handleFileUpload}
-                disabled={isStreaming}
-                className="hidden"
-              />
-            </label>
-          </div>
           {uploadedChunks.length > 0 && (
             <p className="text-[11px] text-emerald-400 font-mono">
-              ✓ Ready: {uploadedChunks.length} chunks ({(uploadedChunks.length * 3).toFixed(0)}s duration at 16kHz)
+              ✓ Ready: {uploadedChunks.length} chunks ({(uploadedChunks.length * 3).toFixed(0)}s at 16kHz)
             </p>
           )}
         </div>
       )}
 
-      {/* Call & Identity Configuration */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-        {/* Claimed Profile */}
+      {/* Call Context & Identity Form (Clean 2x2 Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-950/50 rounded-xl border border-slate-800/80">
+        {/* Target Profile */}
         <div>
-          <label className="text-[11px] font-semibold text-slate-400 block mb-1 flex items-center gap-1">
+          <label className="text-[11px] font-medium text-slate-400 mb-1 flex items-center gap-1">
             <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Target Enrolled Voiceprint:</span>
+            <span>Target Voiceprint</span>
           </label>
           <select
             value={selectedProfileId}
             onChange={(e) => onSelectProfileId(e.target.value)}
             disabled={isStreaming}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+            className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
           >
             {profiles.length === 0 ? (
               <option value="">No profiles enrolled yet</option>
             ) : (
               profiles.map((p) => (
                 <option key={p.profileId} value={p.profileId}>
-                  {p.personName} ({p.role || 'Executive'}) - {p.profileId.substring(0, 10)}...
+                  {p.personName} ({p.role || 'Executive'})
                 </option>
               ))
             )}
           </select>
         </div>
 
-        {/* Call Intent Type */}
+        {/* Intent */}
         <div>
-          <label className="text-[11px] font-semibold text-slate-400 block mb-1 flex items-center gap-1">
-            <Settings className="w-3.5 h-3.5 text-amber-400" />
-            <span>Call Intent Category:</span>
+          <label className="text-[11px] font-medium text-slate-400 mb-1 flex items-center gap-1">
+            <Settings2 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Call Intent</span>
           </label>
           <select
             value={callType}
             onChange={(e) => setCallType(e.target.value)}
             disabled={isStreaming}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-medium"
+            className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
           >
-            <option value="fund_transfer_approval">🚨 Fund Transfer Approval (Critical)</option>
-            <option value="wire_transfer">🚨 Wire Transfer Execution</option>
-            <option value="credential_reset">🔑 Admin Credential Reset</option>
-            <option value="executive_instruction">👔 Urgent Executive Instruction</option>
-            <option value="vendor_invoice_approval">💼 Standard Invoice Approval</option>
-            <option value="general_inquiry">📞 General Inquiry (Low Risk)</option>
+            <option value="fund_transfer_approval">Fund Transfer Approval</option>
+            <option value="wire_transfer">Wire Transfer</option>
+            <option value="credential_reset">Admin Credential Reset</option>
+            <option value="executive_instruction">Executive Instruction</option>
+            <option value="vendor_invoice_approval">Vendor Invoice Approval</option>
+            <option value="general_inquiry">General Inquiry</option>
           </select>
         </div>
 
-        {/* Transaction Amount */}
+        {/* Amount */}
         <div>
-          <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-            Transaction Amount (₹ INR):
+          <label className="text-[11px] font-medium text-slate-400 mb-1 block">
+            Amount (₹ INR)
           </label>
           <input
             type="number"
             value={amount}
             onChange={(e) => setAmount(Number(e.target.value))}
             disabled={isStreaming}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+            className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
             placeholder="e.g. 5000000"
           />
-          {amount >= 500000 && (
-            <span className="text-[10px] text-amber-400 mt-0.5 block font-mono">
-              ⚠️ High Value (&gt; ₹5L) triggers risk boost
-            </span>
-          )}
         </div>
 
-        {/* Spoofed Caller ID */}
+        {/* Caller Number */}
         <div>
-          <label className="text-[11px] font-semibold text-slate-400 block mb-1">
-            Inbound Caller ID (Telecom):
+          <label className="text-[11px] font-medium text-slate-400 mb-1 block">
+            Caller ID
           </label>
           <input
             type="text"
             value={callerNumber}
             onChange={(e) => setCallerNumber(e.target.value)}
             disabled={isStreaming}
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
-            placeholder="+91 XXXXXXXXXX"
+            className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+            placeholder="+91 98765 43210"
           />
         </div>
       </div>
 
-      {/* Live Audio Visualizer Canvas */}
-      <div className="mb-4">
-        <WaveformVisualizer
-          analyserNode={audioCaptureEngine.analyserNode}
-          isActive={isStreaming}
-          rmsLevel={rmsLevel}
-          chunkProgressSec={chunkProgressSec}
-          mode={sourceMode === 'preset' ? 'scenario' : sourceMode}
-          riskScore={currentRisk}
-        />
+      {/* Waveform Visualizer */}
+      <WaveformVisualizer
+        analyserNode={audioCaptureEngine.analyserNode}
+        isActive={isStreaming}
+        rmsLevel={rmsLevel}
+        chunkProgressSec={chunkProgressSec}
+        mode={sourceMode === 'preset' ? 'scenario' : sourceMode}
+        riskScore={currentRisk}
+      />
+
+      {/* Stream Metrics Strip */}
+      <div className="grid grid-cols-4 gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 text-center font-mono">
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase font-sans">Duration</div>
+          <div className="text-xs font-semibold text-white mt-0.5">{streamDurationSec.toFixed(1)}s</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase font-sans">Chunks</div>
+          <div className="text-xs font-semibold text-cyan-400 mt-0.5">#{chunksSentCount}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase font-sans">Sent</div>
+          <div className="text-xs font-semibold text-slate-300 mt-0.5">{(totalBytesSent / 1024).toFixed(0)} KB</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-slate-500 uppercase font-sans">Format</div>
+          <div className="text-xs font-semibold text-emerald-400 mt-0.5">16k / 16b</div>
+        </div>
       </div>
 
-      {/* Telemetry Status Bar */}
-      <div className="grid grid-cols-4 gap-2 mb-4 bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center font-mono">
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase">Duration</div>
-          <div className="text-xs font-bold text-white">{streamDurationSec.toFixed(1)}s</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase">Chunks Sent</div>
-          <div className="text-xs font-bold text-cyan-400">#{chunksSentCount}</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase">Payload Size</div>
-          <div className="text-xs font-bold text-slate-300">{(totalBytesSent / 1024).toFixed(0)} KB</div>
-        </div>
-        <div>
-          <div className="text-[10px] text-slate-500 uppercase">PCM Format</div>
-          <div className="text-xs font-bold text-emerald-400">16k / 16b</div>
-        </div>
-      </div>
-
-      {/* Big Action Button */}
-      <div className="mt-auto pt-2">
+      {/* Primary Action Button */}
+      <div>
         {!isStreaming ? (
           <button
             type="button"
             onClick={handleStartCall}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-extrabold rounded-xl shadow-lg shadow-rose-900/30 transition duration-200 flex items-center justify-center space-x-2 text-sm tracking-wide"
+            className="w-full py-3 px-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40 transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer"
           >
-            <Phone className="w-5 h-5 animate-pulse" />
-            <span>INITIATE CALL & STREAM TO BACKEND</span>
+            <Phone className="w-4 h-4" />
+            <span>START STREAM SIMULATION</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={handleEndCall}
-            className="w-full py-3.5 px-4 bg-red-700 hover:bg-red-600 text-white font-extrabold rounded-xl shadow-lg transition duration-200 flex items-center justify-center space-x-2 text-sm tracking-wide animate-pulse"
+            className="w-full py-3 px-4 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer animate-pulse"
           >
-            <PhoneOff className="w-5 h-5" />
-            <span>TERMINATE CALL SESSION</span>
+            <PhoneOff className="w-4 h-4" />
+            <span>DISCONNECT STREAM</span>
           </button>
         )}
       </div>
     </div>
   );
 };
+

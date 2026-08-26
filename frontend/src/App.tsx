@@ -179,7 +179,11 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#060911] text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200 relative overflow-x-hidden">
+      {/* Background Subtle Ambient Glow */}
+      <div className="fixed top-0 left-1/4 w-96 h-96 bg-cyan-500/5 rounded-full filter blur-[120px] pointer-events-none" />
+      <div className="fixed bottom-10 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full filter blur-[120px] pointer-events-none" />
+
       {/* Top Navigation */}
       <Navbar
         activeTab={activeTab}
@@ -189,10 +193,10 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 z-10">
         {activeTab === 'defense' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Split Screen Left: Threat Simulator (5.5 cols) */}
+            {/* Split Screen Left: Threat Simulator (5 cols) */}
             <div className="lg:col-span-5 h-full">
               <ThreatSimulator
                 profiles={profiles}
@@ -206,7 +210,7 @@ export const App: React.FC = () => {
               />
             </div>
 
-            {/* Split Screen Right: Security Defense Dashboard (6.5 cols) */}
+            {/* Split Screen Right: Security Defense Dashboard (7 cols) */}
             <div className="lg:col-span-7 h-full">
               <SecurityDashboard
                 currentResult={currentResult}
@@ -234,13 +238,13 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="w-full bg-slate-950 border-t border-slate-900 py-3 text-center text-xs font-mono text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="w-full bg-[#05080f]/80 border-t border-slate-800/60 py-3.5 text-center text-xs font-mono text-slate-500 z-10 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
-            Smart India Hackathon (SIH26104) — AI-Powered Real-Time Voice Cloning Detection &amp; Prevention
+            VoiceShield AI • SIH26104 Voice Cloning Detection &amp; Prevention
           </span>
-          <span className="text-cyan-400/80 font-semibold">
-            WavLM + ECAPA-TDNN Dual-Model Engine
+          <span className="text-cyan-400/80 font-medium">
+            WavLM + ECAPA-TDNN In-Process Engine
           </span>
         </div>
       </footer>
@@ -249,3 +253,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

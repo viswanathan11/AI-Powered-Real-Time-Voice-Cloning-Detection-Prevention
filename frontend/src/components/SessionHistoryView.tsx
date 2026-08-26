@@ -5,15 +5,9 @@ import {
   History,
   PhoneCall,
   ShieldAlert,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   Search,
   RefreshCw,
-  ExternalLink,
-  ChevronRight,
   X,
-  Layers,
 } from 'lucide-react';
 
 export const SessionHistoryView: React.FC = () => {
@@ -72,29 +66,28 @@ export const SessionHistoryView: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
+    <div className="space-y-5">
+      {/* Header & Search */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-            <History className="w-5 h-5 text-cyan-400" />
+          <h2 className="text-sm font-bold text-white flex items-center space-x-2">
+            <History className="w-4 h-4 text-cyan-400" />
             <span>Call Monitoring &amp; Fraud Audit Log</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Complete compliance audit trail of analyzed phone calls, chunk timelines, and security alerts
+          <p className="text-xs text-slate-400 mt-0.5">
+            Audit trail of analyzed sessions, chunk telemetry, and security alerts
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 w-full md:w-auto">
-          {/* Search Box */}
-          <div className="relative flex-1 md:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-60">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search session ID or alert..."
+              placeholder="Search sessions or alerts..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-slate-950/60 border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
             />
           </div>
 
@@ -102,46 +95,46 @@ export const SessionHistoryView: React.FC = () => {
             type="button"
             onClick={loadData}
             disabled={loading}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+            className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl transition cursor-pointer"
             title="Refresh Audit Logs"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Active & Ongoing Sessions (6 cols) */}
-        <div className="lg:col-span-6 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800/70">
             <div className="flex items-center space-x-2">
               <PhoneCall className="w-4 h-4 text-cyan-400" />
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Active Monitoring Sessions</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Active Monitoring Sessions</h3>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 font-mono">
               {activeSessions.length} Active
             </span>
           </div>
 
           {activeSessions.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs font-mono">
-              No live monitoring sessions currently ongoing. Start a call in the Threat Simulator.
+              No live monitoring sessions ongoing. Start a call in Live Defense.
             </div>
           ) : (
-            <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
               {activeSessions.map((sess) => (
                 <div
                   key={sess.sessionId}
                   onClick={() => handleOpenDetail(sess.sessionId)}
-                  className="p-3.5 bg-slate-950/80 border border-slate-800 hover:border-cyan-500/50 rounded-xl cursor-pointer transition group"
+                  className="p-3 bg-slate-950/60 border border-slate-800/80 hover:border-cyan-500/50 rounded-xl cursor-pointer transition group"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                      <span className="text-xs font-bold text-white font-mono">{sess.sessionId}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                      <span className="text-xs font-bold text-white font-mono">{sess.sessionId.substring(0, 16)}...</span>
                     </div>
                     <span
-                      className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono ${
+                      className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
                         sess.riskLevel === 'CRITICAL'
                           ? 'bg-rose-500/20 text-rose-300'
                           : sess.riskLevel === 'HIGH'
@@ -153,24 +146,18 @@ export const SessionHistoryView: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-2.5 text-[11px] font-mono text-slate-400">
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-[10px] font-mono text-slate-400">
                     <div>
-                      <span>Claimed Identity:</span>
-                      <div className="text-slate-200 font-bold">{sess.personName || 'Unenrolled'}</div>
+                      <span>Identity: <strong className="text-slate-200">{sess.personName || 'Unenrolled'}</strong></span>
                     </div>
                     <div>
-                      <span>Call Intent:</span>
-                      <div className="text-cyan-300 font-bold truncate">{sess.callType || 'N/A'}</div>
+                      <span>Intent: <strong className="text-cyan-300">{sess.callType || 'N/A'}</strong></span>
                     </div>
                     <div>
-                      <span>Transaction Amount:</span>
-                      <div className="text-white font-bold">
-                        {sess.amount ? `₹${sess.amount.toLocaleString('en-IN')}` : 'N/A'}
-                      </div>
+                      <span>Amount: <strong className="text-white">{sess.amount ? `₹${sess.amount.toLocaleString('en-IN')}` : 'N/A'}</strong></span>
                     </div>
                     <div>
-                      <span>Chunks Processed:</span>
-                      <div className="text-slate-300 font-bold">#{sess.chunkCount}</div>
+                      <span>Chunks: <strong className="text-slate-300">#{sess.chunkCount}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -180,49 +167,49 @@ export const SessionHistoryView: React.FC = () => {
         </div>
 
         {/* Security Alerts Feed (6 cols) */}
-        <div className="lg:col-span-6 bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800/70">
             <div className="flex items-center space-x-2">
               <ShieldAlert className="w-4 h-4 text-rose-400" />
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">Logged Security Alerts</h3>
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Security Alerts Log</h3>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono font-bold">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-300 font-mono">
               {filteredAlerts.length} Alerts
             </span>
           </div>
 
           {filteredAlerts.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs font-mono">
-              No security alerts recorded. All analyzed calls remained within safe parameters.
+              No security alerts recorded. Analyzed calls remained within safe parameters.
             </div>
           ) : (
-            <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
               {filteredAlerts.map((alt, idx) => (
                 <div
                   key={alt.id || idx}
                   onClick={() => handleOpenDetail(alt.sessionId)}
-                  className="p-3.5 bg-slate-950/80 border border-slate-800 hover:border-rose-500/50 rounded-xl cursor-pointer transition"
+                  className="p-3 bg-slate-950/60 border border-slate-800/80 hover:border-rose-500/50 rounded-xl cursor-pointer transition"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-mono font-bold text-[10px]">
+                      <span className="px-1.5 py-0.5 rounded bg-rose-600 text-white font-mono font-bold text-[10px]">
                         {alt.alertType}
                       </span>
-                      <span className="text-xs font-mono text-slate-300">Session: {alt.sessionId}</span>
+                      <span className="text-xs font-mono text-slate-300">{alt.sessionId.substring(0, 12)}...</span>
                     </div>
                     <span className="text-[10px] font-mono text-slate-500">
                       {new Date(alt.createdAt).toLocaleTimeString()}
                     </span>
                   </div>
 
-                  <p className="text-xs text-rose-300/90 mt-2 font-medium">
-                    {alt.reason || 'Deepfake voice cloning probability exceeded risk threshold.'}
+                  <p className="text-xs text-rose-300/90 mt-1.5">
+                    {alt.reason || 'Deepfake voice cloning risk exceeded threshold.'}
                   </p>
-                  <div className="flex justify-between items-center mt-2 text-[10px] font-mono text-slate-400">
-                    <span>Chunk Sequence: #{alt.chunkSeq}</span>
+                  <div className="flex justify-between items-center mt-1.5 text-[10px] font-mono text-slate-400">
+                    <span>Chunk: #{alt.chunkSeq}</span>
                     {alt.riskScore && (
-                      <span className="text-rose-400 font-bold">
-                        Trigger Risk: {(alt.riskScore * 100).toFixed(1)}%
+                      <span className="text-rose-400 font-semibold">
+                        Risk: {(alt.riskScore * 100).toFixed(1)}%
                       </span>
                     )}
                   </div>
@@ -236,68 +223,68 @@ export const SessionHistoryView: React.FC = () => {
       {/* Session Drill-Down Inspection Modal */}
       {selectedSessionId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-5 relative max-h-[85vh] overflow-y-auto space-y-4">
             <button
               onClick={handleCloseDetail}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg transition"
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
             {detailLoading || !sessionDetail ? (
-              <div className="py-16 text-center text-slate-400 font-mono flex flex-col items-center gap-2">
-                <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-                <span>Loading Session Audit Timeline...</span>
+              <div className="py-12 text-center text-slate-400 font-mono flex flex-col items-center gap-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
+                <span>Loading session details...</span>
               </div>
             ) : (
-              <div className="space-y-5">
-                <div className="border-b border-slate-800 pb-4">
+              <div className="space-y-4">
+                <div className="border-b border-slate-800/80 pb-3">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold">
+                    <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-bold">
                       {sessionDetail.status}
                     </span>
-                    <h3 className="text-base font-bold text-white font-mono">
-                      Session ID: {sessionDetail.sessionId}
+                    <h3 className="text-sm font-bold text-white font-mono">
+                      Session: {sessionDetail.sessionId}
                     </h3>
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Claimed Identity: <strong>{sessionDetail.personName || 'Unenrolled Profile'}</strong> | Intent: <strong>{sessionDetail.callType}</strong> | Amount: <strong>{sessionDetail.amount ? `₹${sessionDetail.amount.toLocaleString('en-IN')}` : 'N/A'}</strong>
+                    Identity: <strong>{sessionDetail.personName || 'Unenrolled'}</strong> • Intent: <strong>{sessionDetail.callType}</strong>
                   </p>
                 </div>
 
                 {/* Chunks Timeline Table */}
                 <div>
                   <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">
-                    Sequential Chunk Analysis ({sessionDetail.chunks.length} Total Chunks)
+                    Sequential Chunk Scoring ({sessionDetail.chunks.length} Chunks)
                   </h4>
 
                   {sessionDetail.chunks.length === 0 ? (
-                    <p className="text-xs text-slate-500 font-mono py-4">No chunk records for this session.</p>
+                    <p className="text-xs text-slate-500 font-mono py-2">No chunk records.</p>
                   ) : (
-                    <div className="overflow-x-auto max-h-60 rounded-xl border border-slate-800">
+                    <div className="overflow-x-auto max-h-52 rounded-xl border border-slate-800/80">
                       <table className="w-full text-left text-xs font-mono text-slate-300">
                         <thead className="bg-slate-950 text-slate-400 text-[10px] uppercase border-b border-slate-800">
                           <tr>
-                            <th className="p-2.5">Seq #</th>
-                            <th className="p-2.5">WavLM Synth %</th>
-                            <th className="p-2.5">Speaker Match %</th>
-                            <th className="p-2.5">Composite Risk</th>
-                            <th className="p-2.5">Timestamp</th>
+                            <th className="p-2">Seq</th>
+                            <th className="p-2">WavLM Synth</th>
+                            <th className="p-2">Speaker Match</th>
+                            <th className="p-2">Composite Risk</th>
+                            <th className="p-2">Time</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60 bg-slate-900/60">
+                        <tbody className="divide-y divide-slate-800/50 bg-slate-900/40">
                           {sessionDetail.chunks.map((c) => (
-                            <tr key={c.chunkSeq} className="hover:bg-slate-800/40">
-                              <td className="p-2.5 font-bold text-white">#{c.chunkSeq}</td>
-                              <td className="p-2.5 text-purple-400 font-bold">
+                            <tr key={c.chunkSeq} className="hover:bg-slate-800/30">
+                              <td className="p-2 font-bold text-white">#{c.chunkSeq}</td>
+                              <td className="p-2 text-purple-400">
                                 {(c.syntheticScore * 100).toFixed(1)}%
                               </td>
-                              <td className="p-2.5 text-cyan-400 font-bold">
+                              <td className="p-2 text-cyan-400">
                                 {(c.speakerMatchScore * 100).toFixed(1)}%
                               </td>
-                              <td className="p-2.5">
+                              <td className="p-2">
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                     c.runningRisk >= 0.7
                                       ? 'bg-rose-500/20 text-rose-300'
                                       : c.runningRisk >= 0.3
@@ -308,42 +295,13 @@ export const SessionHistoryView: React.FC = () => {
                                   {(c.runningRisk * 100).toFixed(1)}%
                                 </span>
                               </td>
-                              <td className="p-2.5 text-slate-500 text-[10px]">
+                              <td className="p-2 text-slate-500 text-[10px]">
                                 {new Date(c.createdAt).toLocaleTimeString()}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* Alerts Fired */}
-                <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">
-                    Security Alerts Logged ({sessionDetail.alertsFired.length})
-                  </h4>
-                  {sessionDetail.alertsFired.length === 0 ? (
-                    <p className="text-xs text-emerald-400 font-mono">✓ Zero security alerts fired during this session.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {sessionDetail.alertsFired.map((alt, idx) => (
-                        <div
-                          key={idx}
-                          className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-xl text-xs flex justify-between items-center"
-                        >
-                          <div>
-                            <span className="font-bold text-rose-300">
-                              Chunk #{alt.chunkSeq}: {alt.alertType}
-                            </span>
-                            <p className="text-slate-300 text-[11px] mt-0.5">{alt.reason}</p>
-                          </div>
-                          <span className="text-slate-500 text-[10px] font-mono">
-                            {new Date(alt.createdAt).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      ))}
                     </div>
                   )}
                 </div>
@@ -355,3 +313,4 @@ export const SessionHistoryView: React.FC = () => {
     </div>
   );
 };
+
