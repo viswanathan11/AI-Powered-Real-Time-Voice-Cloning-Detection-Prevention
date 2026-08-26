@@ -24,7 +24,7 @@ class TestWavLMDetector(unittest.TestCase):
         metrics = AcousticArtifactAnalyzer.extract_acoustic_artifact_scores(tensor, 16000)
         self.assertIn("spectral_flux", metrics)
         self.assertIn("vocoder_artifact_score", metrics)
-        self.assertIn("high_freq_irregularity", metrics)
+        self.assertIn("high_freq_ratio", metrics)
         self.assertTrue(0.0 <= metrics["vocoder_artifact_score"] <= 1.0)
 
     def test_detector_output_range(self):

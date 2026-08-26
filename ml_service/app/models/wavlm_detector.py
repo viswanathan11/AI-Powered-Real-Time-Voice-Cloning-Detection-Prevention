@@ -75,14 +75,19 @@ class AcousticArtifactAnalyzer:
         avg_rolloff_freq = float(np.mean(rolloff_bins)) * (sample_rate / 2) / (n_fft // 2 + 1)
 
         # Calibrated vocoder anomaly score:
-        # Genuine human speech exhibits steep spectral roll-off above 3.5kHz (hf_ratio < 0.05).
-        # Neural vocoders (HiFi-GAN, MelGAN) generate unvoiced noise & checkerboard artifacts above 4kHz.
-        hf_ratio_score = float(np.clip((hf_ratio - 0.03) / 0.18, 0.0, 1.0))
-        flatness_score = float(np.clip((hf_flatness - 0.10) / 0.45, 0.0, 1.0))
-        rolloff_score = float(np.clip((avg_rolloff_freq - 2500) / 3200, 0.0, 1.0))
+        # Genuine human speech exhibits steep spectral roll-off above 3.5kHz (hf_ratio < 0.005).
+        # Neural vocoders (HiFi-GAN, MelGAN) generate unvoiced dispersion & artifacts above 4kHz (hf_ratio > 0.02).
+        hf_ratio_score = float(np.clip((hf_ratio - 0.005) / 0.035, 0.0, 1.0))
+        
+        # Scale flatness by whether high-frequency energy is actually present
+        hf_presence = float(np.clip(hf_ratio / 0.015, 0.0, 1.0))
+        effective_flatness = hf_flatness * hf_presence
+        flatness_score = float(np.clip((effective_flatness - 0.20) / 0.50, 0.0, 1.0))
+        
+        rolloff_score = float(np.clip((avg_rolloff_freq - 400.0) / 800.0, 0.0, 1.0))
 
         vocoder_score = float(np.clip(
-            0.45 * hf_ratio_score + 0.35 * flatness_score + 0.20 * rolloff_score,
+            0.50 * hf_ratio_score + 0.30 * flatness_score + 0.20 * rolloff_score,
             0.0, 1.0
         ))
 

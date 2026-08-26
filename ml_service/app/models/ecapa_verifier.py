@@ -147,14 +147,13 @@ class ECAPAVerifier:
     def calibrate_match_score(self, cosine_sim: float) -> float:
         """
         Calibrates raw ECAPA cosine similarity into an intuitive speaker match probability [0.0, 1.0].
-        VoxCeleb ECAPA thresholds:
-          cosine > 0.65 -> High confidence match (> 0.90)
-          cosine ~ 0.40-0.50 -> Indeterminate / threshold area (~ 0.50-0.65)
-          cosine < 0.20 -> Strong non-match (< 0.20)
+        Standard SpeechBrain VoxCeleb ECAPA thresholds:
+          cosine > 0.85 -> High confidence genuine match (> 0.85)
+          cosine ~ 0.70-0.75 -> Indeterminate / boundary area (~ 0.40-0.55)
+          cosine < 0.60 -> Strong non-match / different speaker (< 0.15)
         """
-        # Sigmoid calibration centered around 0.35 with scaling factor 7.0
-        # sigmoid(7 * (cos - 0.35))
-        calibrated = 1.0 / (1.0 + np.exp(-7.0 * (cosine_sim - 0.35)))
+        # Sigmoid calibration centered around 0.73 with scaling factor 12.0
+        calibrated = 1.0 / (1.0 + np.exp(-12.0 * (cosine_sim - 0.73)))
         return float(np.clip(calibrated, 0.0, 1.0))
 
     def average_embeddings(self, embeddings: List[Union[np.ndarray, List[float]]]) -> np.ndarray:

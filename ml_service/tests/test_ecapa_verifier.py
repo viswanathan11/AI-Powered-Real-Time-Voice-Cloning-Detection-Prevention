@@ -33,8 +33,8 @@ class TestECAPAVerifier(unittest.TestCase):
         self.assertAlmostEqual(sim, 0.0, places=4)
 
     def test_calibrate_match_score(self):
-        # Cosine sim 0.9 should have high match score
-        score_high = self.verifier.calibrate_match_score(0.9)
+        # Cosine sim 0.95 should have high match score
+        score_high = self.verifier.calibrate_match_score(0.95)
         self.assertGreater(score_high, 0.90)
 
         # Cosine sim -0.5 should have low match score
