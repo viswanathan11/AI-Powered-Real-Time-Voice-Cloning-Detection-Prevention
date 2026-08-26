@@ -31,7 +31,7 @@ Required by the official problem statement:
 
 ## 2. Architecture Overview
 
-```
+```text
 [Attacker/Caller audio]                     [Employee/Dashboard]
         |                                            ^
         v                                            |
@@ -42,24 +42,16 @@ Required by the official problem statement:
         |                                            |
         |  WebSocket (binary audio frames)   WebSocket (JSON scores)
         v                                            |
-  ============== Spring Boot Backend ==================
-  - WebSocket session handler
-  - Forwards chunk -> ML service (REST)
-  - Risk Scoring Engine (combines scores + context)
-  - Session/alert persistence (Postgres) + live cache (Redis)
-  =======================================================
-        |
-        v  REST: POST /ml/analyze-chunk
-  ============ Python ML Service (FastAPI) =============
+  ====== Unified Python Backend & ML Service (FastAPI) =======
+  - WebSocket session handler & REST APIs
   - ECAPA-TDNN: speaker verification vs enrolled profile
   - WavLM-based classifier: synthetic/deepfake artifact score
-  =======================================================
+  - Risk Scoring Engine (combines scores + context)
+  - Session/alert persistence (Postgres) + live cache (Redis)
+  =============================================================
 ```
 
-**Why this split:** Spring Boot is the team's strength and handles
-sessions/state/APIs well. Python is kept isolated purely for the ML
-inference (pretrained audio models are far more mature in Python) so the
-main backend never gets blocked by model inference.
+**Why this architecture:** By combining the ML inference and backend logic into a single Python FastAPI service, we eliminate network overhead (no internal REST hops) and dramatically simplify the tech stack, enabling rapid iteration for the hackathon timeline.
 
 ---
 
@@ -68,8 +60,7 @@ main backend never gets blocked by model inference.
 | Layer | Choice | Notes |
 |---|---|---|
 | Frontend | React + Vite, Web Audio API, native WebSocket | Raw PCM capture, not `MediaRecorder` (avoids compression artifacts) |
-| Backend | Spring Boot (`spring-boot-starter-websocket`) | Session mgmt, risk engine, REST + WS APIs |
-| ML service | Python + FastAPI, HuggingFace `transformers` (WavLM), SpeechBrain (ECAPA-TDNN), torchaudio | Use **pretrained** checkpoints; fine-tune only the classification head |
+| Backend & ML | Python + FastAPI, HuggingFace `transformers` (WavLM), SpeechBrain (ECAPA-TDNN) | Unified backend handling WebSockets, APIs, and AI inference |
 | DB | PostgreSQL (profiles, sessions, alerts) | Store embeddings only, never raw audio |
 | Cache | Redis | Live/rolling session risk score |
 | Datasets | ASVspoof2019/2021, WaveFake | For fine-tuning the synthetic-detection head |
@@ -128,14 +119,7 @@ Server → Client (JSON, after each chunk is scored):
 }
 ```
 
-### Internal: Backend → ML service
-`POST /ml/analyze-chunk`
-```json
-// Request
-{ "audio": "<base64 wav>", "compareToProfileId": "vp_9a3f..." }
-// Response
-{ "syntheticScore": 0.73, "speakerMatchScore": 0.41 }
-```
+*(Internal note: Analysis is now done in-memory within the FastAPI service, completely eliminating the need for a separate internal REST hop!)*
 
 ### Session history
 `GET /api/session/{sessionId}/history`
@@ -206,21 +190,17 @@ live rolling-score cache per active session (ephemeral, not persisted).
 
 ## 6. Team Split (4-6 people)
 
-- **ML Detection (2 people):** WavLM fine-tuning on ASVspoof/WaveFake,
-  ECAPA-TDNN speaker verification via SpeechBrain, FastAPI wrapper (`/ml/analyze-chunk`)
-- **Backend (2 people):** Spring Boot WebSocket handler, risk engine,
-  Postgres/Redis wiring, REST endpoints
-- **Frontend (1-2 people):** `/simulator` + `/dashboard` split-screen React
-  app, Web Audio API capture/chunking, live risk gauge + alert UI
+- **Backend & ML (2-3 people):** WavLM fine-tuning, ECAPA-TDNN integration, FastAPI WebSocket handler, risk engine, Postgres/Redis wiring, and REST endpoints.
+- **Frontend (2-3 people):** `/simulator` + `/dashboard` split-screen React
+  app, Web Audio API capture/chunking, live risk gauge + alert UI.
 
 ---
 
 ## 7. Build Timeline
 
-- **Week 1:** ML service — WavLM classifier working on ASVspoof (accuracy
-  need not be final), ECAPA-TDNN speaker matching working standalone
-- **Week 2:** Spring Boot backend + DB schema + wire to ML service over REST
-- **Week 3:** React frontend, end-to-end chunk streaming, risk engine tuning
+- **Week 1:** ML models (WavLM & ECAPA-TDNN) integrated into FastAPI with basic REST endpoints.
+- **Week 2:** Add WebSocket handlers, risk engine, Postgres DB schema, and Redis caching to the FastAPI backend.
+- **Week 3:** React frontend, end-to-end chunk streaming, risk engine tuning.
 - **Week 4:** Demo polish, generate clone samples for the live demo, deck, bug buffer
 
 ---
@@ -271,5 +251,4 @@ core demo.
 - Caller-identity known in advance (check against one claimed profile) vs.
   search across all enrolled profiles — **recommended: known in advance**,
   matches the real threat model and avoids unnecessary complexity.
-- gRPC vs REST for backend↔ML service — **recommended: REST** for
-  hackathon speed; gRPC is future-work polish.
+- Database ORM choice for FastAPI — **recommended: SQLAlchemy** or standard `asyncpg` raw queries for performance.
