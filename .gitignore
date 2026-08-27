@@ -1,1 +1,11 @@
 Notes.md
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
