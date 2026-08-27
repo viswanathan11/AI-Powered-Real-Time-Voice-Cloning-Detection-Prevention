@@ -116,6 +116,7 @@ def download_pretrained_models():
     
     # 1. Download WavLM Feature Extractor & Model
     try:
+        # pyrefly: ignore [missing-import]
         from transformers import AutoFeatureExtractor, WavLMModel
         print(f"--> Pulling {MODEL_REGISTRY['wavlm-base-plus']['repo_id']}...")
         AutoFeatureExtractor.from_pretrained(MODEL_REGISTRY['wavlm-base-plus']['repo_id'])
@@ -126,6 +127,7 @@ def download_pretrained_models():
 
     # 2. Download ECAPA-TDNN Speaker Verification Model
     try:
+        # pyrefly: ignore [missing-import]
         from speechbrain.inference.speaker import EncoderClassifier
         print(f"--> Pulling {MODEL_REGISTRY['ecapa-voxceleb']['repo_id']}...")
         savedir = Path("ml_service/models_cache/ecapa")
