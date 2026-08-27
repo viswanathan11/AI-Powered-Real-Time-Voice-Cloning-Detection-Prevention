@@ -44,6 +44,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
   // Mode: 'preset' | 'mic' | 'file'
   const [sourceMode, setSourceMode] = useState<'preset' | 'mic' | 'file'>('preset');
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0]);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Context form state
   const [callType, setCallType] = useState<string>('fund_transfer_approval');
@@ -92,6 +93,8 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
   // Handle Start Call
   const handleStartCall = async () => {
+    if (isStarting || isStreaming) return;
+    setIsStarting(true);
     setChunksSentCount(0);
     setTotalBytesSent(0);
 
@@ -174,6 +177,8 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
       const msg = err instanceof Error ? err.message : String(err);
       alert(`Failed to start call: ${msg}`);
       handleEndCall();
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -488,10 +493,13 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           <button
             type="button"
             onClick={handleStartCall}
-            className="w-full py-3 px-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40 transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer"
+            disabled={isStarting}
+            className={`w-full py-3 px-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40 transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer ${
+              isStarting ? 'opacity-75 cursor-wait' : ''
+            }`}
           >
-            <Phone className="w-4 h-4" />
-            <span>START STREAM SIMULATION</span>
+            <Phone className={`w-4 h-4 ${isStarting ? 'animate-spin' : ''}`} />
+            <span>{isStarting ? 'CONNECTING STREAM...' : 'START STREAM SIMULATION'}</span>
           </button>
         ) : (
           <button

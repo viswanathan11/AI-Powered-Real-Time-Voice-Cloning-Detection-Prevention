@@ -16,7 +16,20 @@ import {
   RefreshCw,
   Fingerprint,
   ShieldCheck,
+  BookOpen,
+  Copy,
+  Check,
+  Info,
+  Volume2,
 } from 'lucide-react';
+
+export const RAINBOW_PASSAGE_SENTENCES = [
+  'When the sunlight strikes raindrops in the air, they act as a prism and form a rainbow.',
+  'The rainbow is a division of white light into many beautiful colors.',
+  'These take the shape of a long round arch, with its path high above, and its two ends apparently beyond the horizon.',
+];
+
+export const RAINBOW_PASSAGE_FULL = RAINBOW_PASSAGE_SENTENCES.join(' ');
 
 interface EnrollmentViewProps {
   profiles: VoiceProfile[];
@@ -39,6 +52,22 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Reading prompt UI states
+  const [promptViewMode, setPromptViewMode] = useState<'step' | 'full'>('step');
+  const [showPromptInfo, setShowPromptInfo] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Copy full passage to clipboard
+  const handleCopyPassage = async () => {
+    try {
+      await navigator.clipboard.writeText(RAINBOW_PASSAGE_FULL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
 
   // Load demo CFO samples into form for instant 1-click enrollment testing
   const handleLoadDemoSamples = async () => {
@@ -175,7 +204,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Clean Privacy Assurance Banner */}
+      {/* Privacy Assurance Banner */}
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-xl backdrop-blur-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3.5">
           <div className="p-2.5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-emerald-400 shrink-0">
@@ -208,17 +237,24 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column: Enrollment Form (7 cols) */}
+        {/* Left Column: Enrollment Form & Rainbow Passage Reading Guide (7 cols) */}
         <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-xl backdrop-blur-xl flex flex-col justify-between space-y-4">
           <div>
-            <div className="flex items-center space-x-2.5 pb-3 mb-4 border-b border-slate-800/70">
-              <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400">
-                <UserPlus className="w-4 h-4" />
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800/70">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-cyan-400">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Enroll Executive Voiceprint</h3>
+                  <p className="text-xs text-slate-400">Record 1-3 voice clips to generate biometric voiceprint</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Enroll Executive Voiceprint</h3>
-                <p className="text-xs text-slate-400">Record 1-3 voice clips to generate biometric voiceprint</p>
-              </div>
+
+              <span className="text-[11px] px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 font-mono hidden sm:inline-flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>Text-Independent Biometrics</span>
+              </span>
             </div>
 
             {/* Notification Messages */}
@@ -280,6 +316,132 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                 </div>
               </div>
 
+              {/* PHONETICALLY BALANCED READING PROMPT (Option A: The Rainbow Passage) */}
+              <div className="bg-gradient-to-b from-slate-950/90 to-slate-900/90 border border-cyan-500/30 rounded-xl p-3.5 space-y-2.5 shadow-inner">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <BookOpen className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold text-white tracking-wide">
+                      Phonetically Balanced Reading Passage (The Rainbow Passage)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-800 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => setPromptViewMode('step')}
+                        className={`px-2 py-0.5 rounded transition ${
+                          promptViewMode === 'step'
+                            ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Sentence Steps
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPromptViewMode('full')}
+                        className={`px-2 py-0.5 rounded transition ${
+                          promptViewMode === 'full'
+                            ? 'bg-cyan-500/20 text-cyan-300 font-semibold'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Full Paragraph
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyPassage}
+                      className="p-1 text-slate-400 hover:text-cyan-300 rounded transition cursor-pointer"
+                      title="Copy passage to clipboard"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPromptInfo(!showPromptInfo)}
+                      className="p-1 text-slate-400 hover:text-cyan-300 rounded transition cursor-pointer"
+                      title="Why read this passage?"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Please read the passage aloud while recording. This speech-science standard excites all vocal tract formant resonances for optimal 192-dimensional ECAPA-TDNN embedding.
+                </p>
+
+                {/* Educational info toggle */}
+                {showPromptInfo && (
+                  <div className="p-2.5 bg-cyan-950/30 border border-cyan-500/20 rounded-lg text-[11px] text-cyan-200/90 leading-relaxed space-y-1">
+                    <p className="font-semibold text-cyan-300">💡 Why The Rainbow Passage?</p>
+                    <p>
+                      The Rainbow Passage is an internationally recognized standard in speech acoustics containing nearly all phonemes, formant transitions, and frequency variations of human speech.
+                    </p>
+                    <p className="text-slate-300">
+                      Once enrolled with this passage, the system verifies your voice against <strong>any different words spoken in future calls</strong> without word-matching.
+                    </p>
+                  </div>
+                )}
+
+                {/* Step-by-Step Prompt Cards */}
+                {promptViewMode === 'step' ? (
+                  <div className="space-y-1.5 pt-1">
+                    {RAINBOW_PASSAGE_SENTENCES.map((sentence, idx) => {
+                      const isRecThis = isRecording && recordingIndex === idx;
+                      const hasSample = !!audioSamples[idx];
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-2.5 rounded-lg border transition-all ${
+                            isRecThis
+                              ? 'bg-cyan-950/40 border-cyan-400 ring-1 ring-cyan-400/50 shadow-lg shadow-cyan-950/50'
+                              : hasSample
+                              ? 'bg-slate-900/80 border-emerald-500/30'
+                              : 'bg-slate-900/50 border-slate-800/80'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center space-x-1.5">
+                              <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                                Clip #{idx + 1} Prompt
+                              </span>
+                              {isRecThis && (
+                                <span className="text-[10px] font-mono text-rose-400 animate-pulse font-bold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                  Read this sentence now...
+                                </span>
+                              )}
+                            </div>
+                            {hasSample && (
+                              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-0.5">
+                                <Check className="w-3 h-3" /> Recorded
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs ${isRecThis ? 'text-white font-medium' : 'text-slate-200'}`}>
+                            &ldquo;{sentence}&rdquo;
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Full Paragraph View */
+                  <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-lg">
+                    <p className="text-xs text-slate-200 leading-relaxed italic">
+                      &ldquo;{RAINBOW_PASSAGE_FULL}&rdquo;
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* 3 Voice Samples Capture Section */}
               <div className="space-y-2 pt-1">
                 <div className="flex justify-between items-center">
@@ -300,27 +462,34 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                       <div
                         key={idx}
                         className={`p-3 rounded-xl border flex flex-col justify-between space-y-2.5 transition ${
-                          hasSample
+                          isRecThis
+                            ? 'bg-cyan-950/30 border-cyan-400 ring-1 ring-cyan-400/40'
+                            : hasSample
                             ? 'bg-emerald-950/20 border-emerald-500/40'
                             : 'bg-slate-950/50 border-slate-800/80'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-300">
-                            Clip #{idx + 1}
-                          </span>
-                          {hasSample ? (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
-                              ✓ Ready
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-semibold text-slate-300">
+                              Clip #{idx + 1}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              Empty
-                            </span>
-                          )}
+                            {hasSample ? (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                                ✓ Ready
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-mono">
+                                Empty
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400 line-clamp-2 italic">
+                            Sentence {idx + 1}: &ldquo;{RAINBOW_PASSAGE_SENTENCES[idx].slice(0, 38)}...&rdquo;
+                          </p>
                         </div>
 
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1.5 pt-1">
                           {!isRecThis ? (
                             <button
                               type="button"
@@ -342,7 +511,10 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
                             </button>
                           )}
 
-                          <label className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer transition">
+                          <label 
+                            className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer transition"
+                            title="Upload pre-recorded WAV"
+                          >
                             <Upload className="w-3.5 h-3.5" />
                             <input
                               type="file"

@@ -16,58 +16,91 @@ export class WebSocketClient {
   private url = '';
   public status: WebSocketStatus = 'DISCONNECTED';
 
-  connect(wsUrl: string, callbacks: WebSocketCallbacks): void {
+  connect(wsUrl: string, callbacks: WebSocketCallbacks, timeoutMs = 8000): Promise<void> {
     this.url = wsUrl;
     this.callbacks = callbacks;
     this.updateStatus('CONNECTING');
 
-    try {
-      this.ws = new WebSocket(wsUrl);
-      this.ws.binaryType = 'arraybuffer';
-
-      this.ws.onopen = () => {
-        this.updateStatus('CONNECTED');
-        if (this.callbacks?.onOpen) {
-          this.callbacks.onOpen();
+    return new Promise<void>((resolve, reject) => {
+      try {
+        if (this.ws) {
+          this.ws.close();
+          this.ws = null;
         }
-      };
 
-      this.ws.onmessage = (event: MessageEvent) => {
-        try {
-          let data: ChunkScoringResult;
-          if (typeof event.data === 'string') {
-            data = JSON.parse(event.data);
-          } else {
-            const decoder = new TextDecoder('utf-8');
-            data = JSON.parse(decoder.decode(event.data));
-          }
-          data.timestamp = new Date().toISOString();
-          if (this.callbacks?.onMessage) {
-            this.callbacks.onMessage(data);
-          }
-        } catch (err) {
-          console.error('Failed to parse WebSocket incoming JSON score:', err, event.data);
-        }
-      };
+        const socket = new WebSocket(wsUrl);
+        this.ws = socket;
+        this.ws.binaryType = 'arraybuffer';
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket encountered error:', error);
+        let isResolved = false;
+        const timer = setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true;
+            this.updateStatus('ERROR');
+            reject(new Error(`WebSocket connection to ${wsUrl} timed out after ${timeoutMs}ms.`));
+          }
+        }, timeoutMs);
+
+        socket.onopen = () => {
+          if (!isResolved) {
+            isResolved = true;
+            clearTimeout(timer);
+            this.updateStatus('CONNECTED');
+            if (this.callbacks?.onOpen) {
+              this.callbacks.onOpen();
+            }
+            resolve();
+          }
+        };
+
+        socket.onmessage = (event: MessageEvent) => {
+          try {
+            let data: ChunkScoringResult;
+            if (typeof event.data === 'string') {
+              data = JSON.parse(event.data);
+            } else {
+              const decoder = new TextDecoder('utf-8');
+              data = JSON.parse(decoder.decode(event.data));
+            }
+            data.timestamp = new Date().toISOString();
+            if (this.callbacks?.onMessage) {
+              this.callbacks.onMessage(data);
+            }
+          } catch (err) {
+            console.error('Failed to parse WebSocket incoming JSON score:', err, event.data);
+          }
+        };
+
+        socket.onerror = (error) => {
+          console.error('WebSocket encountered error:', error);
+          this.updateStatus('ERROR');
+          if (this.callbacks?.onError) {
+            this.callbacks.onError(error);
+          }
+          if (!isResolved) {
+            isResolved = true;
+            clearTimeout(timer);
+            reject(new Error('WebSocket connection failed. Please ensure the backend is running.'));
+          }
+        };
+
+        socket.onclose = (event) => {
+          this.updateStatus('DISCONNECTED');
+          if (this.callbacks?.onClose) {
+            this.callbacks.onClose(event);
+          }
+          if (!isResolved) {
+            isResolved = true;
+            clearTimeout(timer);
+            reject(new Error(`WebSocket connection closed (code ${event.code}). Please ensure the backend server is running.`));
+          }
+        };
+      } catch (err) {
+        console.error('WebSocket connection initialization failure:', err);
         this.updateStatus('ERROR');
-        if (this.callbacks?.onError) {
-          this.callbacks.onError(error);
-        }
-      };
-
-      this.ws.onclose = (event) => {
-        this.updateStatus('DISCONNECTED');
-        if (this.callbacks?.onClose) {
-          this.callbacks.onClose(event);
-        }
-      };
-    } catch (err) {
-      console.error('WebSocket connection initialization failure:', err);
-      this.updateStatus('ERROR');
-    }
+        reject(err);
+      }
+    });
   }
 
   sendBinary(binaryFrame: ArrayBuffer): boolean {

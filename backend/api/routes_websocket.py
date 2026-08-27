@@ -183,7 +183,7 @@ async def websocket_session_stream(websocket: WebSocket, session_id: str):
             # Step E: Send JSON immediately back over WebSocket
             await websocket.send_json(response_payload)
 
-    except (WebSocketDisconnect, asyncio.CancelledError):
+    except (WebSocketDisconnect, asyncio.CancelledError, RuntimeError):
         logger.info(f"WebSocket client disconnected from session '{session_id}' after {chunk_counter} chunks.")
         # Mark session ended with final risk
         if previous_running_risk is not None:

@@ -116,7 +116,7 @@ export const App: React.FC = () => {
     }
 
     // 3. Connect WebSocket client
-    wsClient.connect(wsUrl, {
+    await wsClient.connect(wsUrl, {
       onMessage: (scoringResult) => {
         setCurrentResult(scoringResult);
         setChunkHistory((prev) => [...prev, scoringResult]);

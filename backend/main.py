@@ -55,6 +55,38 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Cache initialization warning: {e}")
 
+    # 3. Auto-seed default executive voiceprint (Ramesh Kumar - CFO) if no profiles exist
+    try:
+        import json
+        from backend.database import AsyncSessionLocal
+        from backend.services.voiceprint_service import VoiceprintService
+        from backend.schemas.voiceprint import EnrollVoiceprintRequest
+
+        async with AsyncSessionLocal() as db:
+            profiles, total = await VoiceprintService.list_profiles(db, limit=1)
+            if total == 0:
+                payloads_path = ROOT_DIR / "frontend" / "public" / "sample_payloads.json"
+                if not payloads_path.exists():
+                    payloads_path = ROOT_DIR / "ml_service" / "samples" / "sample_payloads.json"
+                if payloads_path.exists():
+                    with open(payloads_path, "r", encoding="utf-8") as f:
+                        payloads = json.load(f)
+                    cfo_clips = [
+                        payloads["cfo_enrollment_1.wav"],
+                        payloads["cfo_enrollment_2.wav"],
+                        payloads["cfo_enrollment_3.wav"]
+                    ]
+                    enroll_req = EnrollVoiceprintRequest(
+                        personName="Ramesh Kumar",
+                        role="CFO",
+                        orgId="org_enterprise_01",
+                        audioSamples=cfo_clips
+                    )
+                    await VoiceprintService.enroll_voiceprint(db, enroll_req)
+                    logger.info("Auto-seeded default executive voiceprint: Ramesh Kumar (CFO).")
+    except Exception as e:
+        logger.warning(f"Default voiceprint auto-seed warning: {e}")
+
     logger.info("VoiceShield Unified Backend is fully ready to handle calls and WebSocket streams.")
     yield
 
