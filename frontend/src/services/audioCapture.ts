@@ -41,8 +41,169 @@ export class AudioCaptureEngine {
 
   constructor() {}
 
+  private continuousSampleBuffer: Float32Array[] = [];
+  private isContinuousRecording = false;
+
   /**
-   * Initializes microphone access and sets up Web Audio API processing graph.
+   * Starts a continuous, unlimited-length microphone recording session.
+   * Useful for paragraph reading during enrollment at the user's natural pace.
+   */
+  async startContinuousRecording(options?: {
+    onAudioLevel?: (rms: number) => void;
+    onError?: (error: Error) => void;
+  }): Promise<void> {
+    this.stop();
+    this.continuousSampleBuffer = [];
+    this.isContinuousRecording = true;
+
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.audioContext = new AudioCtx();
+
+      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+
+      this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
+
+      this.analyserNode = this.audioContext.createAnalyser();
+      this.analyserNode.fftSize = 512;
+      this.analyserNode.smoothingTimeConstant = 0.8;
+      this.sourceNode.connect(this.analyserNode);
+
+      const bufferSize = 4096;
+      this.processorNode = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+
+      this.processorNode.onaudioprocess = (e) => {
+        if (!this.isContinuousRecording) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const copy = new Float32Array(inputData.length);
+        copy.set(inputData);
+        this.continuousSampleBuffer.push(copy);
+
+        let sumSq = 0;
+        for (let i = 0; i < copy.length; i++) {
+          sumSq += copy[i] * copy[i];
+        }
+        const rms = Math.sqrt(sumSq / copy.length);
+        if (options?.onAudioLevel) {
+          options.onAudioLevel(rms);
+        }
+      };
+
+      this.sourceNode.connect(this.processorNode);
+      this.processorNode.connect(this.audioContext.destination);
+    } catch (err: unknown) {
+      this.isContinuousRecording = false;
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (options?.onError) {
+        options.onError(error);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Stops continuous recording and automatically slices the complete speech stream
+   * into standardized 3-second 16kHz PCM WAV chunks.
+   */
+  async stopContinuousRecording(): Promise<{ chunks: AudioChunkPayload[]; totalDurationSec: number }> {
+    this.isContinuousRecording = false;
+    const inputSampleRate = this.audioContext?.sampleRate || 48000;
+    const recordedBuffers = [...this.continuousSampleBuffer];
+    this.stop();
+
+    if (recordedBuffers.length === 0) {
+      return { chunks: [], totalDurationSec: 0 };
+    }
+
+    const totalLength = recordedBuffers.reduce((acc, b) => acc + b.length, 0);
+    const merged = new Float32Array(totalLength);
+    let offset = 0;
+    for (const buf of recordedBuffers) {
+      merged.set(buf, offset);
+      offset += buf.length;
+    }
+
+    const totalDurationSec = totalLength / inputSampleRate;
+
+    // Resample to 16kHz mono
+    const resampled = this.resampleAudio(merged, inputSampleRate, this.targetSampleRate);
+
+    // Slice into standard 3-second chunks (48,000 samples each)
+    const chunkSize = this.targetChunkSamples; // 48,000
+    const chunks: AudioChunkPayload[] = [];
+    let seq = 1;
+
+    if (resampled.length < chunkSize) {
+      // Audio is shorter than 3s: pad to 3s to form a single valid chunk
+      const padded = new Float32Array(chunkSize);
+      padded.set(resampled);
+
+      let sumSq = 0;
+      for (let j = 0; j < resampled.length; j++) {
+        sumSq += resampled[j] * resampled[j];
+      }
+      const rms = Math.sqrt(sumSq / (resampled.length || 1));
+
+      const wavBytes = this.encodeWAV(padded, this.targetSampleRate);
+      const binaryFrame = this.createBinaryFrame(seq, wavBytes);
+      const wavBlob = new Blob([wavBytes.buffer as ArrayBuffer], { type: 'audio/wav' });
+      const base64Wav = this.uint8ArrayToBase64(wavBytes);
+
+      chunks.push({
+        chunkSeq: seq,
+        binaryFrame,
+        wavBlob,
+        base64Wav,
+        durationSec: totalDurationSec,
+        rmsLevel: rms,
+      });
+    } else {
+      for (let i = 0; i < resampled.length; i += chunkSize) {
+        const slice = resampled.subarray(i, i + chunkSize);
+        // Ignore residual tail if shorter than 1.0s (16,000 samples) and we already have valid chunks
+        if (slice.length < 16000 && chunks.length > 0) {
+          break;
+        }
+
+        const chunkSamples = new Float32Array(chunkSize);
+        chunkSamples.set(slice);
+
+        let sumSq = 0;
+        for (let j = 0; j < slice.length; j++) {
+          sumSq += slice[j] * slice[j];
+        }
+        const rms = Math.sqrt(sumSq / slice.length);
+
+        const wavBytes = this.encodeWAV(chunkSamples, this.targetSampleRate);
+        const binaryFrame = this.createBinaryFrame(seq, wavBytes);
+        const wavBlob = new Blob([wavBytes.buffer as ArrayBuffer], { type: 'audio/wav' });
+        const base64Wav = this.uint8ArrayToBase64(wavBytes);
+
+        chunks.push({
+          chunkSeq: seq,
+          binaryFrame,
+          wavBlob,
+          base64Wav,
+          durationSec: this.targetChunkDurationSec,
+          rmsLevel: rms,
+        });
+
+        seq++;
+      }
+    }
+
+    return { chunks, totalDurationSec };
+  }
+
+  /**
+   * Initializes microphone access and sets up Web Audio API processing graph for live call streaming.
    */
   async startMicrophone(callbacks: AudioCaptureCallbacks): Promise<void> {
     this.callbacks = callbacks;
