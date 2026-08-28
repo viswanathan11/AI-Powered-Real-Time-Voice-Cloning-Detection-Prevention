@@ -88,15 +88,15 @@ class AudioProcessor:
 
         # Energy / Silence detection
         rms_energy = float(torch.sqrt(torch.mean(tensor_wave ** 2)).item())
-        is_silent = rms_energy < settings.SILENCE_RMS_THRESHOLD
+        is_silent = rms_energy < 0.002
 
-        # DC offset removal and gentle speech level normalization
+        # DC offset removal and adaptive speech level normalization
         if not is_silent and rms_energy > 1e-4:
             # Center waveform (zero mean)
             tensor_wave = tensor_wave - torch.mean(tensor_wave)
-            # Normalize active speech to target RMS 0.08 for model consistency
+            # Normalize active speech to target RMS 0.08 for model consistency (cap gain to prevent noise amplification)
             target_rms = 0.08
-            gain = min(12.0, max(0.2, target_rms / rms_energy))
+            gain = min(3.5, max(0.3, target_rms / rms_energy))
             tensor_wave = tensor_wave * gain
             # Recalculate normalized RMS
             rms_energy = float(torch.sqrt(torch.mean(tensor_wave ** 2)).item())
@@ -165,8 +165,11 @@ class AudioProcessor:
             frames = np.lib.stride_tricks.sliding_window_view(audio_np, frame_len)[::hop_len]
             frame_rms = np.sqrt(np.mean(frames ** 2, axis=1) + 1e-10)
 
-            # Active speech frames have RMS above silence threshold
-            active_speech_mask = frame_rms >= settings.SILENCE_RMS_THRESHOLD
+            mean_frame_rms = float(np.mean(frame_rms))
+            speech_thresh = max(0.0015, min(0.006, 0.30 * mean_frame_rms))
+
+            # Active speech frames have RMS above dynamic speech threshold
+            active_speech_mask = frame_rms >= speech_thresh
             speech_ratio = float(np.sum(active_speech_mask) / len(active_speech_mask))
 
             num_noise = max(1, int(len(frame_rms) * 0.15))
@@ -174,15 +177,15 @@ class AudioProcessor:
             signal_rms = np.mean(frame_rms[active_speech_mask]) if np.any(active_speech_mask) else noise_floor_rms
             snr_db = float(20.0 * np.log10(max(1.0, signal_rms / (noise_floor_rms + 1e-6))))
         else:
-            speech_ratio = 1.0 if rms >= settings.SILENCE_RMS_THRESHOLD else 0.0
-            snr_db = 20.0 if rms >= settings.SILENCE_RMS_THRESHOLD else 0.0
+            speech_ratio = 1.0 if rms >= 0.002 else 0.0
+            snr_db = 20.0 if rms >= 0.002 else 0.0
 
         # Classification
-        if rms < settings.SILENCE_RMS_THRESHOLD or duration_sec < settings.MIN_AUDIO_DURATION_SEC or speech_ratio < 0.15:
+        if rms < 0.002 or duration_sec < settings.MIN_AUDIO_DURATION_SEC or speech_ratio < 0.10:
             quality = "INSUFFICIENT_SPEECH"
             is_usable = False
             confidence = 0.0
-        elif clipping_ratio > 0.08 or (snr_db < 3.0 and speech_ratio < 0.40):
+        elif clipping_ratio > 0.08 or (snr_db < 2.5 and speech_ratio < 0.30):
             quality = "POOR_QUALITY"
             is_usable = True
             confidence = 0.50
@@ -206,11 +209,10 @@ class AudioProcessor:
         self,
         waveform: torch.Tensor,
         sample_rate: int = 16000,
-        energy_thresh: float = settings.SILENCE_RMS_THRESHOLD,
         min_duration_sec: float = settings.MIN_AUDIO_DURATION_SEC
     ) -> torch.Tensor:
         """
-        Trims leading and trailing silence/noise frames using Voice Activity Detection (VAD).
+        Trims leading and trailing silence/noise frames using dynamic Voice Activity Detection (VAD).
         Ensures that ECAPA pooling and WavLM sequence dynamics operate only over active speech.
         """
         audio_np = waveform.squeeze().cpu().numpy()
@@ -223,7 +225,10 @@ class AudioProcessor:
         frames = np.lib.stride_tricks.sliding_window_view(audio_np, frame_len)[::hop_len]
         frame_rms = np.sqrt(np.mean(frames ** 2, axis=1) + 1e-10)
 
-        active_mask = frame_rms >= energy_thresh
+        mean_frame_rms = float(np.mean(frame_rms))
+        speech_thresh = max(0.0015, min(0.006, 0.30 * mean_frame_rms))
+
+        active_mask = frame_rms >= speech_thresh
         if not np.any(active_mask):
             return waveform
 

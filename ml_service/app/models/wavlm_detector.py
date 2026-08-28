@@ -55,21 +55,22 @@ class AcousticArtifactAnalyzer:
         f, t, Zxx = signal.stft(filtered_audio, fs=sample_rate, nperseg=n_fft, noverlap=n_fft - hop_length)
         spec = np.abs(Zxx) + 1e-8  # [freq_bins, time_frames]
 
-        # 3. Stationary Noise Floor Estimation (estimate from lowest 20% energy frames)
+        # 3. Stationary Noise Floor Estimation (estimate from lowest 25% energy frames)
         frame_energy = np.mean(spec**2, axis=0)
-        num_noise_frames = max(2, int(len(frame_energy) * 0.20))
+        num_noise_frames = max(2, int(len(frame_energy) * 0.25))
         noise_frame_indices = np.argsort(frame_energy)[:num_noise_frames]
         stationary_noise_spectrum = np.median(spec[:, noise_frame_indices], axis=1, keepdims=True)
 
         # Spectral subtraction: oversubtraction with a small floor
-        spec_clean = np.maximum(spec * 0.02, spec - 1.3 * stationary_noise_spectrum)
+        spec_clean = np.maximum(spec * 0.05, spec - 1.2 * stationary_noise_spectrum)
 
         # 4. Voicing Detection (speech formants in 200 Hz - 3400 Hz range)
         voice_band_mask = (f >= 200) & (f <= 3400)
         hf_band_mask = (f >= 3800) & (f <= 7500)
 
         voiced_energy = np.mean(spec_clean[voice_band_mask, :], axis=0)
-        voicing_thresh = np.percentile(voiced_energy, 35)
+        noise_floor_val = np.median(voiced_energy[noise_frame_indices])
+        voicing_thresh = max(noise_floor_val * 2.0, np.percentile(voiced_energy, 40))
         active_voiced_frames = voiced_energy > voicing_thresh
 
         if not np.any(active_voiced_frames):
@@ -77,16 +78,16 @@ class AcousticArtifactAnalyzer:
 
         spec_active = spec_clean[:, active_voiced_frames]
 
-        # 5. Measure High-Frequency to Voice-Band Ratio ONLY during active speech formants
+        # 5. Measure High-Frequency to Voice-Band Ratio ONLY during active voiced formants
         hf_power = np.mean(spec_active[hf_band_mask, :]**2, axis=0)
         voice_power = np.mean(spec_active[voice_band_mask, :]**2, axis=0) + 1e-8
         ratio_per_frame = hf_power / voice_power
         hf_mid_ratio = float(np.mean(ratio_per_frame))
 
         # Calibrated vocoder anomaly score:
-        # Genuine human speech exhibits steep roll-off: hf_mid_ratio < 0.0010
-        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0070
-        vocoder_score = float(np.clip((hf_mid_ratio - 0.0010) / 0.0065, 0.0, 1.0))
+        # Genuine human speech with typical microphone noise/sibilance: hf_mid_ratio < 0.010
+        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.015
+        vocoder_score = float(np.clip((hf_mid_ratio - 0.0050) / 0.0120, 0.0, 1.0))
 
         # 6. High-Frequency Spectral Flatness
         hf_active_spec = spec_active[hf_band_mask, :]
@@ -96,7 +97,7 @@ class AcousticArtifactAnalyzer:
         hf_flatness = float(np.mean(geom_mean / arith_mean))
 
         # Modulate flatness by presence of high-frequency energy
-        flatness_score = float(np.clip((hf_flatness - 0.20) / 0.35, 0.0, 1.0)) * vocoder_score
+        flatness_score = float(np.clip((hf_flatness - 0.25) / 0.35, 0.0, 1.0)) * vocoder_score
 
         # Weighted acoustic vocoder score
         final_vocoder_score = float(np.clip(0.80 * vocoder_score + 0.20 * flatness_score, 0.0, 1.0))
@@ -138,8 +139,12 @@ class WavLMDetector:
 
         try:
             logger.info(f"Loading WavLM detector model ({settings.WAVLM_MODEL_ID}) on device '{self.device}'...")
-            self.feature_extractor = AutoFeatureExtractor.from_pretrained(settings.WAVLM_MODEL_ID)
-            self.wavlm_model = WavLMModel.from_pretrained(settings.WAVLM_MODEL_ID).to(self.device)
+            try:
+                self.feature_extractor = AutoFeatureExtractor.from_pretrained(settings.WAVLM_MODEL_ID, local_files_only=True)
+                self.wavlm_model = WavLMModel.from_pretrained(settings.WAVLM_MODEL_ID, local_files_only=True).to(self.device)
+            except Exception:
+                self.feature_extractor = AutoFeatureExtractor.from_pretrained(settings.WAVLM_MODEL_ID)
+                self.wavlm_model = WavLMModel.from_pretrained(settings.WAVLM_MODEL_ID).to(self.device)
             self.wavlm_model.eval()
             self.is_fallback = False
             logger.info("WavLM synthetic detector loaded successfully.")
@@ -207,17 +212,44 @@ class WavLMDetector:
                     # Layer 12: Long-range prosody and natural rhythm
                     l12 = outputs.hidden_states[12].squeeze(0).cpu().numpy()
 
-                    step_mean1 = float(np.mean(np.linalg.norm(np.diff(l1, axis=0), axis=1)))
-                    step_mean3 = float(np.mean(np.linalg.norm(np.diff(l3, axis=0), axis=1)))
-                    step_mean12 = float(np.mean(np.linalg.norm(np.diff(l12, axis=0), axis=1)))
-                    layer1_var = float(np.mean(np.var(l1, axis=0)))
+                    # Calculate dynamic frame-to-frame velocity over active speech frames
+                    # WavLM output frames are ~20ms (50 Hz)
+                    num_frames = l1.shape[0]
+                    if num_frames > 4:
+                        # Extract active speech energy per WavLM frame
+                        samples_per_frame = max(1, len(audio_np) // num_frames)
+                        frame_energies = []
+                        for fi in range(num_frames):
+                            chunk_seg = audio_np[fi * samples_per_frame:(fi + 1) * samples_per_frame]
+                            frame_energies.append(np.sqrt(np.mean(chunk_seg**2) + 1e-10) if len(chunk_seg) > 0 else 0.0)
+                        
+                        frame_energies = np.array(frame_energies)
+                        active_mask = frame_energies > max(0.003, np.percentile(frame_energies, 30))
+                        
+                        if np.sum(active_mask) > 5:
+                            l1_active = l1[active_mask]
+                            l3_active = l3[active_mask]
+                            l12_active = l12[active_mask]
+                        else:
+                            l1_active = l1
+                            l3_active = l3
+                            l12_active = l12
+                    else:
+                        l1_active = l1
+                        l3_active = l3
+                        l12_active = l12
+
+                    step_mean1 = float(np.mean(np.linalg.norm(np.diff(l1_active, axis=0), axis=1))) if len(l1_active) > 1 else 2.50
+                    step_mean3 = float(np.mean(np.linalg.norm(np.diff(l3_active, axis=0), axis=1))) if len(l3_active) > 1 else 1.95
+                    step_mean12 = float(np.mean(np.linalg.norm(np.diff(l12_active, axis=0), axis=1))) if len(l12_active) > 1 else 0.90
+                    layer1_var = float(np.mean(np.var(l1_active, axis=0)))
 
                 # AI synthesizers & vocoders produce over-smooth transitions across frames
                 # Natural human speech produces high dynamic variance and velocity
-                score_l1 = float(np.clip((1.55 - step_mean1) / 0.55, 0.0, 1.0))
-                score_l3 = float(np.clip((1.25 - step_mean3) / 0.45, 0.0, 1.0))
-                score_l12 = float(np.clip((0.46 - step_mean12) / 0.16, 0.0, 1.0))
-                score_var = float(np.clip((0.0035 - layer1_var) / 0.0022, 0.0, 1.0))
+                score_l1 = float(np.clip((1.35 - step_mean1) / 0.50, 0.0, 1.0))
+                score_l3 = float(np.clip((1.05 - step_mean3) / 0.40, 0.0, 1.0))
+                score_l12 = float(np.clip((0.42 - step_mean12) / 0.15, 0.0, 1.0))
+                score_var = float(np.clip((0.0028 - layer1_var) / 0.0020, 0.0, 1.0))
 
                 wavlm_neural_score = float(0.35 * score_l1 + 0.30 * score_l3 + 0.15 * score_l12 + 0.20 * score_var)
             except Exception as e:
@@ -230,11 +262,11 @@ class WavLMDetector:
         if self.is_fallback:
             final_synthetic_score = vocoder_score
         else:
-            if wavlm_neural_score > 0.20 and vocoder_score > 0.20:
+            if wavlm_neural_score > 0.30 and vocoder_score > 0.30:
                 final_synthetic_score = float(np.clip(0.50 * wavlm_neural_score + 0.50 * vocoder_score + 0.10, 0.0, 1.0))
-            elif wavlm_neural_score > 0.50 or vocoder_score > 0.50:
-                final_synthetic_score = float(np.clip(max(0.70 * wavlm_neural_score, 0.80 * vocoder_score), 0.0, 1.0))
-            elif wavlm_neural_score < 0.15 and vocoder_score < 0.15:
+            elif wavlm_neural_score > 0.65 or vocoder_score > 0.65:
+                final_synthetic_score = float(np.clip(max(0.75 * wavlm_neural_score, 0.80 * vocoder_score), 0.0, 1.0))
+            elif wavlm_neural_score < 0.25 and vocoder_score < 0.25:
                 final_synthetic_score = 0.0
             else:
                 final_synthetic_score = float(np.clip(0.40 * wavlm_neural_score + 0.40 * vocoder_score, 0.0, 1.0))

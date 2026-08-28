@@ -170,15 +170,15 @@ class ECAPAVerifier:
     def classify_speaker_decision(self, cosine_sim: float, quality: str = "GOOD") -> str:
         """
         Maps cosine similarity and audio quality to a discrete verification decision:
-        - 'MATCH': cosine >= 0.74 and audio is usable
-        - 'MISMATCH': cosine < 0.65 and audio is usable
-        - 'UNCERTAIN': 0.65 <= cosine < 0.74 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
+        - 'MATCH': cosine >= 0.72 and audio is usable
+        - 'MISMATCH': cosine < 0.68 and audio is usable
+        - 'UNCERTAIN': 0.68 <= cosine < 0.72 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
         """
         if quality == "INSUFFICIENT_SPEECH":
             return "UNCERTAIN"
-        if cosine_sim >= 0.74:
+        if cosine_sim >= 0.72:
             return "MATCH"
-        elif cosine_sim < 0.65:
+        elif cosine_sim < 0.68:
             return "MISMATCH"
         else:
             return "UNCERTAIN"

@@ -32,19 +32,26 @@ class RiskEngine:
         has_enrolled_profile: bool = True
     ) -> float:
         """
-        Calculates raw composite risk based on weights:
-          rawRisk = synthetic_weight * synthetic_score + speaker_mismatch_weight * (1 - speaker_match_score)
+        Calculates raw composite risk based on security triage rules:
+          1. AI Voice Clone (synthetic >= 0.60): Critical Risk (>= 0.85)
+          2. Human Imposter (match < 0.50): High Risk (>= 0.70)
+          3. Authentic Executive (match >= 0.50, synthetic < 0.35): Low Risk (<= 0.20)
         """
         synthetic_score = max(0.0, min(1.0, float(synthetic_score)))
         speaker_match_score = max(0.0, min(1.0, float(speaker_match_score)))
 
         if not has_enrolled_profile:
-            return round(synthetic_score, 4)
+            if synthetic_score >= 0.60:
+                return round(max(0.85, synthetic_score), 4)
+            return round(synthetic_score * 0.50, 4)
 
-        raw_risk = (
-            self.synthetic_weight * synthetic_score +
-            self.speaker_mismatch_weight * (1.0 - speaker_match_score)
-        )
+        if synthetic_score >= 0.60:
+            raw_risk = max(0.85, synthetic_score)
+        elif speaker_match_score < 0.50:
+            raw_risk = max(0.70, 0.85 * (1.0 - speaker_match_score))
+        else:
+            raw_risk = min(0.20, 0.15 * synthetic_score + 0.10 * (1.0 - speaker_match_score))
+
         return round(float(max(0.0, min(1.0, raw_risk))), 4)
 
     def evaluate_verdict(
