@@ -1,0 +1,18 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+  "python.pythonPath": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}\\backend",
+    "${workspaceFolder}\\ml_service",
+    "${workspaceFolder}\\venv\\Lib\\site-packages",
+    "C:\\Users\\Cursory_Inverse\\.vs_venv\\Lib\\site-packages"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}\\backend",
+    "${workspaceFolder}\\ml_service",
+    "${workspaceFolder}\\venv\\Lib\\site-packages",
+    "C:\\Users\\Cursory_Inverse\\.vs_venv\\Lib\\site-packages"
+  ]
+}
