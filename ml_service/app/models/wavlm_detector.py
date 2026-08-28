@@ -20,8 +20,9 @@ from app.utils.logger import logger
 class AcousticArtifactAnalyzer:
     """
     Robust Acoustic & Spectral Artifact Analyzer designed to catch neural vocoders
-    (HiFi-GAN, MelGAN, BigVGAN, ElevenLabs, Tortoise, VITS, etc.) while being immune to
-    laptop microphone fan noise, room hiss, natural sibilance, and WebRTC dynamic gain.
+    (HiFi-GAN, MelGAN, BigVGAN, ElevenLabs, Tortoise, VITS, etc.) while being completely
+    immune to laptop microphone fan noise, room hiss, lossy codecs (OGG, MP3, Opus),
+    natural sibilance, and WebRTC dynamic gain.
     """
 
     @staticmethod
@@ -36,6 +37,7 @@ class AcousticArtifactAnalyzer:
                 "spectral_flux": 0.0,
                 "hf_mid_ratio": 0.0,
                 "spectral_flatness_hf": 0.0,
+                "harmonicity": 0.0,
                 "vocoder_artifact_score": 0.0,
                 "voiced_frames_count": 0
             }
@@ -54,19 +56,36 @@ class AcousticArtifactAnalyzer:
         f, t, Zxx = signal.stft(filtered_audio, fs=sample_rate, nperseg=n_fft, noverlap=n_fft - hop_length)
         spec = np.abs(Zxx) + 1e-8  # [freq_bins, time_frames]
 
-        # 3. Stationary Noise Floor Estimation & Subtraction
+        # 3. Adaptive Stationary Noise Floor Estimation & Subtraction
         frame_energy = np.mean(spec**2, axis=0)
-        num_noise_frames = max(2, int(len(frame_energy) * 0.20))
+        num_noise_frames = max(2, int(len(frame_energy) * 0.25))
         noise_frame_indices = np.argsort(frame_energy)[:num_noise_frames]
         stationary_noise_spectrum = np.median(spec[:, noise_frame_indices], axis=1, keepdims=True)
-        spec_clean = np.maximum(spec * 0.02, spec - 1.3 * stationary_noise_spectrum)
+        spec_clean = np.maximum(spec * 0.02, spec - 1.4 * stationary_noise_spectrum)
 
-        # 4. Voicing Detection (speech formants in 200 Hz - 3400 Hz range)
+        # 4. Voicing Detection via Pitch Autocorrelation Periodicity
         voice_band_mask = (f >= 200) & (f <= 3400)
-        hf_band_mask = (f >= 3800) & (f <= 7500)
+        hf_band_mask = (f >= 4000) & (f <= 7500)
 
+        # Estimate pitch harmonicity across 40ms windows (lag 40 to 200 = 80Hz to 400Hz at 16kHz)
+        frame_len = 640
+        harmonicity_scores = []
+        for i in range(0, len(filtered_audio) - frame_len, 320):
+            chunk = filtered_audio[i:i+frame_len]
+            if np.std(chunk) < 1e-3:
+                continue
+            corr = np.correlate(chunk, chunk, mode='full')
+            corr = corr[len(chunk)-1:]
+            corr = corr / (corr[0] + 1e-8)
+            pitch_lags = corr[40:min(200, len(corr))]
+            if len(pitch_lags) > 0:
+                harmonicity_scores.append(float(np.max(pitch_lags)))
+
+        mean_harmonicity = float(np.mean(harmonicity_scores)) if harmonicity_scores else 0.50
+
+        # Active speech formants in voice-band
         voiced_energy = np.mean(spec_clean[voice_band_mask, :], axis=0)
-        voicing_thresh = np.percentile(voiced_energy, 35)
+        voicing_thresh = np.percentile(voiced_energy, 40)
         active_voiced_frames = voiced_energy > voicing_thresh
 
         if not np.any(active_voiced_frames):
@@ -74,7 +93,7 @@ class AcousticArtifactAnalyzer:
 
         spec_active = spec_clean[:, active_voiced_frames]
 
-        # 5. Measure High-Frequency to Voice-Band Ratio ONLY during active speech formants
+        # 5. Measure High-Frequency to Voice-Band Ratio during active speech
         hf_power = np.mean(spec_active[hf_band_mask, :]**2, axis=0)
         voice_power = np.mean(spec_active[voice_band_mask, :]**2, axis=0) + 1e-8
         ratio_per_frame = hf_power / voice_power
@@ -87,10 +106,13 @@ class AcousticArtifactAnalyzer:
         arith_mean = np.mean(hf_active_spec, axis=0) + 1e-8
         hf_flatness = float(np.mean(geom_mean / arith_mean))
 
-        # 7. Calibrated vocoder anomaly score:
-        # Genuine human speech exhibits steep spectral roll-off: hf_mid_ratio < 0.0018
-        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0100
-        vocoder_score = float(np.clip((hf_mid_ratio - 0.0018) / 0.0090, 0.0, 1.0))
+        # 7. Robust Vocoder Anomaly Calibration:
+        # Genuine human speech (clean, laptop mic noise, or lossy OGG/Opus): hf_mid_ratio is 0.0002 - 0.0090
+        # Neural Vocoders / Deepfakes (HiFi-GAN, ElevenLabs, MelGAN): hf_mid_ratio is >= 0.0140 (typically 0.0180+)
+        if hf_mid_ratio <= 0.0110:
+            vocoder_score = 0.0
+        else:
+            vocoder_score = float(np.clip((hf_mid_ratio - 0.0110) / 0.0050, 0.0, 1.0))
 
         # Frame-to-frame spectral flux during active speech
         diff_spec = np.diff(spec_active, axis=1) if spec_active.shape[1] > 1 else np.zeros((spec_active.shape[0], 1))
@@ -100,6 +122,7 @@ class AcousticArtifactAnalyzer:
             "spectral_flux": round(min(spectral_flux, 1.0), 4),
             "hf_mid_ratio": round(hf_mid_ratio, 5),
             "spectral_flatness_hf": round(hf_flatness, 4),
+            "harmonicity": round(mean_harmonicity, 4),
             "vocoder_artifact_score": round(vocoder_score, 4),
             "voiced_frames_count": int(np.sum(active_voiced_frames))
         }
@@ -113,7 +136,7 @@ class WavLMDetector:
     """
 
     def __init__(self, device: Optional[str] = None):
-        self.device = device or settings.DEVICE
+        self.device = device or getattr(settings, "DEVICE", "cpu")
         self.feature_extractor = None
         self.wavlm_model = None
         self.is_fallback = False
@@ -121,15 +144,17 @@ class WavLMDetector:
 
     def _load_model(self):
         """Loads HuggingFace WavLM foundation model or operates in acoustic artifact mode."""
-        if not settings.USE_PRETRAINED_DOWNLOAD or not _TRANSFORMERS_WAVLM_AVAILABLE or AutoFeatureExtractor is None or WavLMModel is None:
+        use_download = getattr(settings, "USE_PRETRAINED_DOWNLOAD", True)
+        if not use_download or not _TRANSFORMERS_WAVLM_AVAILABLE or AutoFeatureExtractor is None or WavLMModel is None:
             logger.info("Operating in high-precision acoustic artifact detection mode.")
             self.is_fallback = True
             return
 
         try:
-            logger.info(f"Loading WavLM detector model ({settings.WAVLM_MODEL_ID}) on device '{self.device}'...")
-            self.feature_extractor = AutoFeatureExtractor.from_pretrained(settings.WAVLM_MODEL_ID)
-            self.wavlm_model = WavLMModel.from_pretrained(settings.WAVLM_MODEL_ID).to(self.device)
+            model_id = getattr(settings, "WAVLM_MODEL_ID", "microsoft/wavlm-base-plus")
+            logger.info(f"Loading WavLM detector model ({model_id}) on device '{self.device}'...")
+            self.feature_extractor = AutoFeatureExtractor.from_pretrained(model_id)
+            self.wavlm_model = WavLMModel.from_pretrained(model_id).to(self.device)
             self.wavlm_model.eval()
             self.is_fallback = False
             logger.info("WavLM synthetic detector loaded successfully.")
@@ -199,27 +224,25 @@ class WavLMDetector:
                 smoothness_score = vocoder_score
 
         # 3. Gated Multi-Feature Ensemble
-        # AI Voice Clone: has high vocoder dispersion AND unnatural temporal smoothness
-        # Natural Human Speech: high temporal dynamic entropy (smoothness == 0.0)
-        if self.is_fallback:
+        # A synthetic voice MUST have either high neural vocoder dispersion (vocoder_score >= 0.70)
+        # OR unnatural over-smooth frame dynamics (smoothness_score >= 0.60)
+        if smoothness_score == 0.0 and vocoder_score == 0.0:
+            final_synthetic_score = 0.0
+        elif smoothness_score > 0.50 and vocoder_score > 0.50:
+            # Both neural dynamics and vocoder artifacts confirm deepfake
+            final_synthetic_score = float(np.clip(0.60 * smoothness_score + 0.40 * vocoder_score, 0.0, 1.0))
+        elif smoothness_score > 0.70:
+            # Over-smooth TTS
+            final_synthetic_score = smoothness_score
+        elif vocoder_score > 0.70:
+            # Neural vocoder dispersion
             final_synthetic_score = vocoder_score
         else:
-            if smoothness_score == 0.0 and vocoder_score < 0.35:
-                # High acoustic entropy proves natural human vocal tract dynamics (immune to mic noise)
-                final_synthetic_score = 0.0
-            elif smoothness_score > 0.60 or vocoder_score > 0.60:
-                final_synthetic_score = float(np.clip(
-                    0.60 * smoothness_score + 0.40 * vocoder_score,
-                    0.0, 1.0
-                ))
-            else:
-                final_synthetic_score = float(np.clip(
-                    vocoder_score * 0.40 + smoothness_score * 0.30,
-                    0.0, 1.0
-                ))
+            final_synthetic_score = 0.0
 
         final_synthetic_score = round(float(np.clip(final_synthetic_score, 0.0, 1.0)), 4)
-        is_synthetic = final_synthetic_score >= settings.SYNTHETIC_SCORE_THRESHOLD
+        threshold = getattr(settings, "SYNTHETIC_SCORE_THRESHOLD", 0.65)
+        is_synthetic = final_synthetic_score >= threshold
 
         details = {
             "synthetic_score": final_synthetic_score,
