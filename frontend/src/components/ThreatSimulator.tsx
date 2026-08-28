@@ -115,9 +115,9 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         audioCaptureEngine.stop();
       }
 
-      // For preset attacks and live calls, ensure a claimed profile is targeted
+      // For preset attacks, default to an enrolled target profile
       let profileToClaim = selectedProfileId;
-      if (!profileToClaim && profiles.length > 0) {
+      if (sourceMode === 'preset' && !profileToClaim && profiles.length > 0) {
         const matched = profiles.find((p) => p.personName.toLowerCase().includes('ramesh')) || profiles[0];
         profileToClaim = matched.profileId;
         onSelectProfileId(profileToClaim);
@@ -498,16 +498,33 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
             disabled={isStreaming}
             className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
           >
-            {profiles.length === 0 ? (
-              <option value="">No profiles enrolled yet</option>
-            ) : (
-              profiles.map((p) => (
-                <option key={p.profileId} value={p.profileId}>
-                  {p.personName} ({p.role || 'Executive'})
-                </option>
-              ))
-            )}
+            <option value="">General Caller (Unenrolled / Test Voice Only)</option>
+            {profiles.map((p) => (
+              <option key={p.profileId} value={p.profileId}>
+                {p.personName} ({p.role || 'Executive'})
+              </option>
+            ))}
           </select>
+          {sourceMode === 'mic' ? (
+            <div className="mt-1.5 space-y-1">
+              {selectedProfileId ? (
+                <div className="p-2 bg-cyan-950/40 border border-cyan-500/30 rounded-lg text-[10px] text-cyan-200">
+                  <span className="font-bold text-cyan-300">Target: {profiles.find(p => p.profileId === selectedProfileId)?.personName}</span>
+                  <p className="text-slate-300 mt-0.5">
+                    Speaking with your own voice will match this profile if it is your voice, or trigger <strong>Voiceprint Mismatch (Imposter)</strong> if you are not this person.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 font-sans">
+                  🎤 General Caller: Testing natural vs AI voice clone without profile matching.
+                </p>
+              )}
+            </div>
+          ) : sourceMode === 'preset' ? (
+            <p className="text-[10px] text-slate-400 font-sans mt-1">
+              <span className="text-amber-400">⚡ Preset Mode: Streams demo audio (Ramesh Kumar). To speak with your mic, switch to "Live Mic" above.</span>
+            </p>
+          ) : null}
         </div>
 
         {/* Intent */}

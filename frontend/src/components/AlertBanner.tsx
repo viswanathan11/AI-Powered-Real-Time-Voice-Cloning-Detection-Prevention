@@ -88,7 +88,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-200 mt-0.5">
-              High AI clone likelihood for {amount ? `₹${amount.toLocaleString('en-IN')}` : 'transaction'}. {reason || 'Vocoder artifacts detected.'}
+              Voiceprint divergence for <strong>{claimedName || 'Executive'}</strong>{amount ? ` on ₹${amount.toLocaleString('en-IN')} transfer` : ''}. {reason || 'Caller biometric features do not match the registered profile.'}
             </p>
           </div>
         </div>
@@ -121,7 +121,7 @@ export const AlertBanner: React.FC<AlertBannerProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-200 mt-0.5">
-            {reason || 'Severe vocoder synthesis detected. Impersonation attack.'} Session flagged to SOC.
+            {reason || 'Critical AI voice clone synthesis detected.'} Session flagged to SOC.
           </p>
         </div>
       </div>

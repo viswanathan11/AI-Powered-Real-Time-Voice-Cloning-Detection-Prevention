@@ -45,6 +45,10 @@ export interface ChunkScoringResult {
   chunkSeq: number;
   syntheticScore: number;
   speakerMatchScore: number;
+  speakerDecision?: string;
+  audioQuality?: string;
+  evidenceConfidence?: number;
+  classification?: string;
   cosineSimilarity?: number | null;
   runningRisk: number;
   riskLevel: RiskLevel;

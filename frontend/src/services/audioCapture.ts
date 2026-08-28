@@ -58,13 +58,17 @@ export class AudioCaptureEngine {
 
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioContext = new AudioCtx();
+      try {
+        this.audioContext = new AudioCtx({ sampleRate: this.targetSampleRate });
+      } catch {
+        this.audioContext = new AudioCtx();
+      }
 
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: false,
           autoGainControl: true,
         },
       });
@@ -214,14 +218,18 @@ export class AudioCaptureEngine {
     try {
       // Prefer 16kHz AudioContext if browser supports custom sample rate
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioContext = new AudioCtx();
+      try {
+        this.audioContext = new AudioCtx({ sampleRate: this.targetSampleRate });
+      } catch {
+        this.audioContext = new AudioCtx();
+      }
 
-      // Request clean 16kHz-optimized mic stream with native browser noise suppression
+      // Request clean 16kHz-optimized mic stream with native browser noise handling
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           echoCancellation: true,
-          noiseSuppression: true,
+          noiseSuppression: false,
           autoGainControl: true,
         },
       });
@@ -344,7 +352,7 @@ export class AudioCaptureEngine {
   }
 
   /**
-   * Linear interpolation resampler for converting browser sample rate (44.1k/48k) to standard 16kHz.
+   * Bandlimited / anti-aliased interpolation resampler for converting browser sample rate to 16kHz.
    */
   public resampleAudio(audioData: Float32Array, fromRate: number, toRate: number): Float32Array {
     if (fromRate === toRate) return audioData;
@@ -352,12 +360,27 @@ export class AudioCaptureEngine {
     const newLength = Math.round(audioData.length / ratio);
     const result = new Float32Array(newLength);
 
+    // If downsampling, apply a simple box-filter / moving average to mitigate high-frequency aliasing
+    const filterWidth = Math.max(1, Math.floor(ratio));
+
     for (let i = 0; i < newLength; i++) {
-      const srcIndex = i * ratio;
-      const srcIndexFloor = Math.floor(srcIndex);
-      const srcIndexCeil = Math.min(srcIndexFloor + 1, audioData.length - 1);
-      const frac = srcIndex - srcIndexFloor;
-      result[i] = audioData[srcIndexFloor] * (1 - frac) + audioData[srcIndexCeil] * frac;
+      const center = i * ratio;
+      if (ratio > 1.2) {
+        let sum = 0;
+        let count = 0;
+        const start = Math.max(0, Math.floor(center - filterWidth / 2));
+        const end = Math.min(audioData.length, Math.ceil(center + filterWidth / 2));
+        for (let j = start; j < end; j++) {
+          sum += audioData[j];
+          count++;
+        }
+        result[i] = count > 0 ? sum / count : 0;
+      } else {
+        const srcIndexFloor = Math.floor(center);
+        const srcIndexCeil = Math.min(srcIndexFloor + 1, audioData.length - 1);
+        const frac = center - srcIndexFloor;
+        result[i] = audioData[srcIndexFloor] * (1 - frac) + audioData[srcIndexCeil] * frac;
+      }
     }
     return result;
   }

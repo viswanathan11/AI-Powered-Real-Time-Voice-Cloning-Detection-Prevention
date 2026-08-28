@@ -122,15 +122,19 @@ export const App: React.FC = () => {
 
         // If alert was fired, record it
         if (scoringResult.alertTriggered) {
+          const alertDesc =
+            scoringResult.verdict === 'CRITICAL_AI_CLONE' || scoringResult.syntheticScore >= 0.60
+              ? `AI Voice Clone: Neural vocoder synthesis detected (${(scoringResult.syntheticScore * 100).toFixed(0)}%)`
+              : scoringResult.verdict === 'IMPOSTER_MISMATCH' || scoringResult.speakerMatchScore < 0.50
+              ? `Voiceprint mismatch: biometric divergence from profile (${(scoringResult.speakerMatchScore * 100).toFixed(1)}% match)`
+              : 'Elevated transaction impersonation risk';
+
           const newAlert: SecurityAlert = {
             sessionId: scoringResult.sessionId,
             chunkSeq: scoringResult.chunkSeq,
             alertType: scoringResult.recommendation,
             riskScore: scoringResult.runningRisk,
-            reason:
-              scoringResult.riskLevel === 'CRITICAL'
-                ? 'High synthetic vocoder artifacts detected + voiceprint mismatch'
-                : 'Elevated voice cloning risk detected',
+            reason: alertDesc,
             createdAt: new Date().toISOString(),
           };
           setSessionAlerts((prev) => [...prev, newAlert]);

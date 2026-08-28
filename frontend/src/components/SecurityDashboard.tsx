@@ -60,7 +60,7 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
     verdictBorder = 'border-amber-500/50 bg-gradient-to-r from-amber-950/60 via-slate-950/80 to-amber-950/40 text-amber-200 shadow-lg shadow-amber-950/40';
     verdictIcon = <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse" />;
     verdictBadge = 'bg-amber-500/25 text-amber-300 border border-amber-500/40';
-  } else if (verdict === 'AUTHENTIC_EXECUTIVE' || (speakerMatchScore >= 0.70 && syntheticScore < 0.35)) {
+  } else if (verdict === 'AUTHENTIC_EXECUTIVE' || verdict === 'GENERAL_HUMAN' || (speakerMatchScore >= 0.65 && syntheticScore < 0.35)) {
     verdictBorder = 'border-emerald-500/40 bg-gradient-to-r from-emerald-950/50 via-slate-950/80 to-emerald-950/30 text-emerald-200 shadow-lg shadow-emerald-950/30';
     verdictIcon = <CheckCircle2 className="w-5 h-5 text-emerald-400" />;
     verdictBadge = 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40';
@@ -279,19 +279,31 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Raw Cosine Sim:</span>
-                <span className={`font-bold ${cosineSim >= 0.74 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span>Decision &amp; Cosine:</span>
+                <span className={`font-bold ${cosineSim >= 0.72 ? 'text-emerald-400' : cosineSim < 0.68 ? 'text-rose-400' : 'text-amber-400'}`}>
+                  {currentResult?.speakerDecision ? `[${currentResult.speakerDecision}] ` : ''}
                   {typeof cosineSim === 'number' ? cosineSim.toFixed(3) : 'N/A'}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Risk Engine Status Tag */}
+          {/* Risk Engine Status & Audio Quality Tag */}
           <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 px-3.5 flex items-center justify-between text-[11px] font-mono text-slate-400">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              <span>Engine: Multi-Chunk EMA Smoothed (α=0.70)</span>
+              <span>Engine: Multi-Chunk EMA (α=0.70)</span>
+              {currentResult?.audioQuality && (
+                <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                  currentResult.audioQuality === 'GOOD'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : currentResult.audioQuality === 'POOR_QUALITY'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {currentResult.audioQuality}
+                </span>
+              )}
             </span>
             <span className="text-cyan-300 font-bold font-mono">
               {(riskScore * 100).toFixed(1)}% Impersonation Risk

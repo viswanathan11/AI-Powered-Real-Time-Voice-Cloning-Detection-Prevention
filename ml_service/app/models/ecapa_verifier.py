@@ -159,26 +159,26 @@ class ECAPAVerifier:
     def calibrate_match_score(self, cosine_sim: float) -> float:
         """
         Calibrates raw ECAPA cosine similarity into an intuitive speaker match probability [0.0, 1.0].
-        Standard SpeechBrain VoxCeleb ECAPA thresholds:
-          cosine >= 0.80 -> Genuine match (> 83%)
-          cosine ~ 0.70 -> Decision boundary (50%)
-          cosine <= 0.60 -> Strong non-match / different speaker (< 14%)
+        Calibrated for live microphone and acoustic variation:
+          cosine >= 0.75 -> Strong Genuine match (> 82%)
+          cosine ~ 0.62 -> Decision boundary (50%)
+          cosine <= 0.50 -> Strong non-match / imposter (< 19%)
         """
-        calibrated = 1.0 / (1.0 + np.exp(-18.0 * (cosine_sim - 0.70)))
+        calibrated = 1.0 / (1.0 + np.exp(-12.0 * (cosine_sim - 0.62)))
         return float(np.clip(calibrated, 0.0, 1.0))
 
     def classify_speaker_decision(self, cosine_sim: float, quality: str = "GOOD") -> str:
         """
         Maps cosine similarity and audio quality to a discrete verification decision:
-        - 'MATCH': cosine >= 0.72 and audio is usable
-        - 'MISMATCH': cosine < 0.68 and audio is usable
-        - 'UNCERTAIN': 0.68 <= cosine < 0.72 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
+        - 'MATCH': cosine >= 0.65 and audio is usable
+        - 'MISMATCH': cosine < 0.58 and audio is usable
+        - 'UNCERTAIN': 0.58 <= cosine < 0.65 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
         """
         if quality == "INSUFFICIENT_SPEECH":
             return "UNCERTAIN"
-        if cosine_sim >= 0.72:
+        if cosine_sim >= 0.65:
             return "MATCH"
-        elif cosine_sim < 0.68:
+        elif cosine_sim < 0.58:
             return "MISMATCH"
         else:
             return "UNCERTAIN"
