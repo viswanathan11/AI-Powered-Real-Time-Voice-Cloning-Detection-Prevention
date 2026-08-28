@@ -170,6 +170,13 @@ class WavLMDetector:
                 "note": "Silent or near-silent chunk"
             }
 
+        # Apply VAD trimming to isolate active speech frames
+        try:
+            from app.services.audio_processor import audio_processor
+            waveform = audio_processor.trim_silence_vad(waveform, sample_rate=sample_rate)
+        except Exception:
+            pass
+
         # 1. Extract acoustic vocoder artifact metrics
         acoustic_metrics = AcousticArtifactAnalyzer.extract_acoustic_artifact_scores(waveform, sample_rate)
         vocoder_score = acoustic_metrics["vocoder_artifact_score"]

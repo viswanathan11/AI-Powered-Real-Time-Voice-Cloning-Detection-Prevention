@@ -202,5 +202,39 @@ class AudioProcessor:
             "confidenceMultiplier": confidence
         }
 
+    def trim_silence_vad(
+        self,
+        waveform: torch.Tensor,
+        sample_rate: int = 16000,
+        energy_thresh: float = settings.SILENCE_RMS_THRESHOLD,
+        min_duration_sec: float = settings.MIN_AUDIO_DURATION_SEC
+    ) -> torch.Tensor:
+        """
+        Trims leading and trailing silence/noise frames using Voice Activity Detection (VAD).
+        Ensures that ECAPA pooling and WavLM sequence dynamics operate only over active speech.
+        """
+        audio_np = waveform.squeeze().cpu().numpy()
+        frame_len = int(sample_rate * 0.025)
+        hop_len = int(sample_rate * 0.010)
+
+        if len(audio_np) < frame_len:
+            return waveform
+
+        frames = np.lib.stride_tricks.sliding_window_view(audio_np, frame_len)[::hop_len]
+        frame_rms = np.sqrt(np.mean(frames ** 2, axis=1) + 1e-10)
+
+        active_mask = frame_rms >= energy_thresh
+        if not np.any(active_mask):
+            return waveform
+
+        first_active = max(0, int(np.argmax(active_mask) * hop_len))
+        last_active = min(len(audio_np), int((len(active_mask) - 1 - np.argmax(active_mask[::-1])) * hop_len + frame_len))
+
+        trimmed_audio = audio_np[first_active:last_active]
+        if len(trimmed_audio) < int(min_duration_sec * sample_rate):
+            return waveform
+
+        return torch.from_numpy(trimmed_audio).float().unsqueeze(0).to(waveform.device)
+
 
 audio_processor = AudioProcessor()

@@ -94,19 +94,22 @@ class ECAPAVerifier:
 
     def extract_embedding(self, waveform: torch.Tensor, sample_rate: int = 16000) -> np.ndarray:
         """
-        Extracts a normalized 192-dimensional speaker embedding from an audio tensor.
-
-        Args:
-            waveform: Tensor of shape [1, num_samples] or [num_samples]
-            sample_rate: Audio sample rate (default 16000)
-
-        Returns:
-            np.ndarray of shape (192,), L2-normalized float32
+        Extracts 192-dimensional speaker embedding vector from 16kHz mono audio.
+        Applies voice activity trimming so statistical pooling operates purely on speech frames.
+        Returns L2-normalized numpy array of shape (192,).
         """
         if waveform.dim() == 1:
             waveform = waveform.unsqueeze(0)
+        elif waveform.dim() == 3:
+            waveform = waveform.squeeze(1)
 
-        # Ensure tensor is on correct device
+        # Apply VAD trimming to isolate active speech frames
+        try:
+            from app.services.audio_processor import audio_processor
+            waveform = audio_processor.trim_silence_vad(waveform, sample_rate=sample_rate)
+        except Exception:
+            pass
+
         waveform = waveform.to(self.device)
 
         with torch.no_grad():
@@ -157,25 +160,25 @@ class ECAPAVerifier:
         """
         Calibrates raw ECAPA cosine similarity into an intuitive speaker match probability [0.0, 1.0].
         Standard SpeechBrain VoxCeleb ECAPA thresholds:
-          cosine >= 0.85 -> High confidence genuine match (> 88%)
-          cosine ~ 0.74 -> Decision boundary (50%)
-          cosine <= 0.67 -> Strong non-match / different speaker (< 22%)
+          cosine >= 0.80 -> Genuine match (> 83%)
+          cosine ~ 0.70 -> Decision boundary (50%)
+          cosine <= 0.60 -> Strong non-match / different speaker (< 14%)
         """
-        calibrated = 1.0 / (1.0 + np.exp(-18.0 * (cosine_sim - 0.74)))
+        calibrated = 1.0 / (1.0 + np.exp(-18.0 * (cosine_sim - 0.70)))
         return float(np.clip(calibrated, 0.0, 1.0))
 
     def classify_speaker_decision(self, cosine_sim: float, quality: str = "GOOD") -> str:
         """
         Maps cosine similarity and audio quality to a discrete verification decision:
-        - 'MATCH': cosine >= 0.78 and audio is usable
-        - 'MISMATCH': cosine < 0.70 and audio is usable
-        - 'UNCERTAIN': 0.70 <= cosine < 0.78 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
+        - 'MATCH': cosine >= 0.74 and audio is usable
+        - 'MISMATCH': cosine < 0.65 and audio is usable
+        - 'UNCERTAIN': 0.65 <= cosine < 0.74 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
         """
         if quality == "INSUFFICIENT_SPEECH":
             return "UNCERTAIN"
-        if cosine_sim >= 0.78:
+        if cosine_sim >= 0.74:
             return "MATCH"
-        elif cosine_sim < 0.70:
+        elif cosine_sim < 0.65:
             return "MISMATCH"
         else:
             return "UNCERTAIN"

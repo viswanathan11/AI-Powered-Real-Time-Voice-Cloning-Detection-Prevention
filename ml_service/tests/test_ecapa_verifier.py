@@ -55,12 +55,12 @@ class TestECAPAVerifier(unittest.TestCase):
         self.assertAlmostEqual(np.linalg.norm(avg), 1.0, places=4)
 
     def test_classify_speaker_decision(self):
-        # Match (cosine >= 0.78)
+        # Match (cosine >= 0.74)
         self.assertEqual(self.verifier.classify_speaker_decision(0.85, "GOOD"), "MATCH")
-        # Mismatch (cosine < 0.70)
-        self.assertEqual(self.verifier.classify_speaker_decision(0.65, "GOOD"), "MISMATCH")
-        # Uncertain (borderline 0.70 - 0.78)
-        self.assertEqual(self.verifier.classify_speaker_decision(0.74, "GOOD"), "UNCERTAIN")
+        # Mismatch (cosine < 0.65)
+        self.assertEqual(self.verifier.classify_speaker_decision(0.55, "GOOD"), "MISMATCH")
+        # Uncertain (borderline 0.65 - 0.74)
+        self.assertEqual(self.verifier.classify_speaker_decision(0.70, "GOOD"), "UNCERTAIN")
         # Uncertain (poor audio quality)
         self.assertEqual(self.verifier.classify_speaker_decision(0.85, "INSUFFICIENT_SPEECH"), "UNCERTAIN")
 
