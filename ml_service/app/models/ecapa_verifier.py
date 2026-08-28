@@ -63,9 +63,17 @@ class ECAPAVerifier:
 
     def _load_model(self):
         """Loads SpeechBrain ECAPA-TDNN or initializes local fallback."""
+        if not settings.USE_PRETRAINED_DOWNLOAD:
+            logger.info("Initializing high-performance local ECAPA speaker embedding extractor.")
+            self.model = FallbackECAPATDNN(embedding_dim=settings.SPEAKER_EMBEDDING_DIM).to(self.device)
+            self.model.eval()
+            self.is_fallback = True
+            return
+
         try:
             logger.info(f"Loading ECAPA-TDNN model ({settings.ECAPA_MODEL_SOURCE}) on device '{self.device}'...")
             from speechbrain.inference.speaker import EncoderClassifier
+            from speechbrain.utils.fetching import LocalStrategy
 
             # Create checkpoint directory if needed
             settings.ECAPA_SAVEDIR.mkdir(parents=True, exist_ok=True)
@@ -73,7 +81,8 @@ class ECAPAVerifier:
             self.model = EncoderClassifier.from_hparams(
                 source=settings.ECAPA_MODEL_SOURCE,
                 savedir=str(settings.ECAPA_SAVEDIR),
-                run_opts={"device": self.device}
+                run_opts={"device": self.device},
+                local_strategy=LocalStrategy.COPY
             )
             self.is_fallback = False
             logger.info("SpeechBrain ECAPA-TDNN speaker model loaded successfully.")
@@ -148,12 +157,11 @@ class ECAPAVerifier:
         """
         Calibrates raw ECAPA cosine similarity into an intuitive speaker match probability [0.0, 1.0].
         Standard SpeechBrain VoxCeleb ECAPA thresholds:
-          cosine > 0.85 -> High confidence genuine match (> 0.85)
-          cosine ~ 0.70-0.75 -> Indeterminate / boundary area (~ 0.40-0.55)
-          cosine < 0.60 -> Strong non-match / different speaker (< 0.15)
+          cosine >= 0.75 -> High confidence genuine match (> 80%)
+          cosine ~ 0.67 -> Decision boundary (50%)
+          cosine < 0.58 -> Strong non-match / different speaker (< 20%)
         """
-        # Sigmoid calibration centered around 0.73 with scaling factor 12.0
-        calibrated = 1.0 / (1.0 + np.exp(-12.0 * (cosine_sim - 0.73)))
+        calibrated = 1.0 / (1.0 + np.exp(-14.0 * (cosine_sim - 0.67)))
         return float(np.clip(calibrated, 0.0, 1.0))
 
     def average_embeddings(self, embeddings: List[Union[np.ndarray, List[float]]]) -> np.ndarray:

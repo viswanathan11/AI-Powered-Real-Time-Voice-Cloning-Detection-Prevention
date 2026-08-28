@@ -4,6 +4,12 @@ import soundfile as sf
 import io
 import base64
 import torch
+import sys
+from pathlib import Path
+
+ml_service_dir = Path(__file__).resolve().parent.parent
+if str(ml_service_dir) not in sys.path:
+    sys.path.insert(0, str(ml_service_dir))
 
 from app.services.audio_processor import AudioProcessor
 

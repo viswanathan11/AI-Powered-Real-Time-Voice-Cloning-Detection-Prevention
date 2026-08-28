@@ -5,3 +5,6 @@ torchaudio
 transformers
 speechbrain
 pydantic
+datasets
+soundfile
+scipy

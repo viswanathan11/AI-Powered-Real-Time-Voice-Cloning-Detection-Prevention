@@ -1,0 +1,47 @@
+%%{init: {'theme':'base', 'themeVariables': { 'fontFamily': 'arial', 'edgeLabelBackground':'#ffffff'}}}%%
+graph TD
+    classDef user fill:#ff9f43,stroke:#e67e22,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef frontend fill:#00cec9,stroke:#00b894,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef backend fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef ml fill:#6c5ce7,stroke:#a29bfe,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef db fill:#fdcb6e,stroke:#ffeaa7,stroke-width:2px,color:#2d3436,font-weight:bold;
+    classDef engine fill:#d63031,stroke:#ff7675,stroke-width:2px,color:#fff,font-weight:bold;
+    classDef subgraphStyle fill:#f8f9fa,stroke:#ced4da,stroke-width:2px,stroke-dasharray: 5 5;
+
+    User(("🗣️ Attacker/Caller Audio")):::user -->|"Audio Input"| Simulator
+    
+    subgraph Client ["💻 Frontend (React + Vite)"]
+        Simulator("🎙️ Simulator App<br/>• Web Audio API<br/>• 16kHz PCM Capture<br/>• 3s Overlapping Chunks"):::frontend
+        Dashboard("📊 Dashboard App<br/>• Live Risk Gauge<br/>• Alert Banner"):::frontend
+    end
+
+    Simulator -- "WebSocket<br/>(Binary Audio Frames)" --> API
+    
+    subgraph BackendLayer ["⚙️ Unified Python Backend & ML Service (FastAPI)"]
+        API("🔌 WebSocket Session Handler<br/>& REST APIs"):::backend
+        
+        subgraph ML ["🧠 Machine Learning Models"]
+            ECAPA{{"👤 ECAPA-TDNN<br/>Speaker Verification<br/>vs Enrolled Profile"}}:::ml
+            WavLM{{"🤖 WavLM-based Classifier<br/>Synthetic/Deepfake Score"}}:::ml
+        end
+        
+        API --> ECAPA
+        API --> WavLM
+        
+        RiskEngine("⚠️ Risk Scoring Engine<br/>Combines scores + context"):::engine
+        ECAPA --> RiskEngine
+        WavLM --> RiskEngine
+    end
+    
+    RiskEngine -- "WebSocket<br/>(JSON Scores)" --> Dashboard
+
+    subgraph DataLayer ["🗄️ Data Storage"]
+        Postgres[("🐘 PostgreSQL<br/>Session/Alert Persistence")]:::db
+        Redis[("⚡ Redis<br/>Live/Rolling Cache")]:::db
+    end
+    
+    RiskEngine -.->|"Persist"| Postgres
+    RiskEngine -.->|"Cache"| Redis
+    
+    %% Assign styles to subgraphs
+    class Client,BackendLayer,DataLayer,ML subgraphStyle;

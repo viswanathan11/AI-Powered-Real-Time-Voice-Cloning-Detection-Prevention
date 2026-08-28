@@ -90,6 +90,17 @@ class AudioProcessor:
         rms_energy = float(torch.sqrt(torch.mean(tensor_wave ** 2)).item())
         is_silent = rms_energy < settings.SILENCE_RMS_THRESHOLD
 
+        # DC offset removal and gentle speech level normalization
+        if not is_silent and rms_energy > 1e-4:
+            # Center waveform (zero mean)
+            tensor_wave = tensor_wave - torch.mean(tensor_wave)
+            # Normalize active speech to target RMS 0.08 for model consistency
+            target_rms = 0.08
+            gain = min(12.0, max(0.2, target_rms / rms_energy))
+            tensor_wave = tensor_wave * gain
+            # Recalculate normalized RMS
+            rms_energy = float(torch.sqrt(torch.mean(tensor_wave ** 2)).item())
+
         # Clamp values to valid [-1.0, 1.0] range
         tensor_wave = torch.clamp(tensor_wave, -1.0, 1.0)
 

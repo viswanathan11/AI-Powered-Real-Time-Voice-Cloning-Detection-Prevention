@@ -25,15 +25,17 @@ class Settings(BaseModel):
     DEVICE: str = os.getenv("DEVICE", "cuda" if os.getenv("USE_CUDA", "false").lower() == "true" else "cpu")
     
     # Model Configurations
+    USE_PRETRAINED_DOWNLOAD: bool = os.getenv("USE_PRETRAINED_DOWNLOAD", "true").lower() in ("true", "1", "yes")
+
     # Speaker Verification (ECAPA-TDNN)
     ECAPA_MODEL_SOURCE: str = os.getenv("ECAPA_MODEL_SOURCE", "speechbrain/spkrec-ecapa-voxceleb")
-    ECAPA_SAVEDIR: Path = Path(os.getenv("ECAPA_SAVEDIR", "./models/checkpoints/ecapa_tdnn"))
+    ECAPA_SAVEDIR: Path = Path(os.getenv("ECAPA_SAVEDIR", "ml_service/models_cache/ecapa_real"))
     SPEAKER_EMBEDDING_DIM: int = 192
     SPEAKER_SIMILARITY_THRESHOLD: float = 0.50
 
     # Synthetic Voice Detection (WavLM / Acoustic Artifact Detector)
-    WAVLM_MODEL_ID: str = os.getenv("WAVLM_MODEL_ID", "microsoft/wavlm-base")
-    WAVLM_SAVEDIR: Path = Path(os.getenv("WAVLM_SAVEDIR", "./models/checkpoints/wavlm"))
+    WAVLM_MODEL_ID: str = os.getenv("WAVLM_MODEL_ID", "microsoft/wavlm-base-plus")
+    WAVLM_SAVEDIR: Path = Path(os.getenv("WAVLM_SAVEDIR", "ml_service/models_cache/wavlm"))
     SYNTHETIC_SCORE_THRESHOLD: float = 0.65
 
     # Risk Engine Default Weights (Plane.md section 4)

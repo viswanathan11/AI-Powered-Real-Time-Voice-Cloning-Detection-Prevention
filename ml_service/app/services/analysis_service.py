@@ -73,32 +73,62 @@ class AnalysisService:
                 cosine_sim = self.ecapa.compute_similarity(chunk_emb_np, target_embedding)
                 speaker_match_score = round(self.ecapa.calibrate_match_score(cosine_sim), 4)
 
-        # 4. Composite Risk Calculation
-        # Plane.md formula: runningRisk = 0.5 * syntheticScore + 0.5 * (1 - speakerMatchScore)
+        # 4. Composite Risk & 3-Way Triage Evaluation
+        # Scenarios:
+        # A. Silence / Noise: risk = 0.0, ALLOW
+        # B. AI Voice Clone (synthetic >= 0.60): risk = max(0.85, synthetic), ESCALATE
+        # C. Human Imposter (match < 0.50): risk = max(0.70, 0.85*(1 - match)), VERIFY_CALLBACK
+        # D. Authentic Executive (match >= 0.50): risk = max(0.05, 0.25*synth + 0.20*(1-match)), ALLOW
+        # E. General Unenrolled: risk = synthetic_score
+        verdict = "SAFE_CALL"
+        verdict_label = "Natural Human Voice"
+
         if is_silent:
             running_risk = 0.0
             risk_level = "LOW"
             recommendation = "ALLOW"
-        elif speaker_match_score is not None:
-            w_synth = settings.SYNTHETIC_WEIGHT
-            w_mismatch = settings.SPEAKER_MISMATCH_WEIGHT
-            speaker_mismatch = 1.0 - speaker_match_score
-            running_risk = round(w_synth * synthetic_score + w_mismatch * speaker_mismatch, 4)
-            running_risk = max(0.0, min(1.0, running_risk))
-            risk_level, recommendation = self._compute_risk_level_and_recommendation(running_risk)
+            verdict = "AWAITING_SPEECH"
+            verdict_label = "Silence / Speech Pause"
+        elif target_embedding is not None and speaker_match_score is not None:
+            if synthetic_score >= settings.SYNTHETIC_SCORE_THRESHOLD or synthetic_score >= 0.60:
+                running_risk = max(0.85, round(synthetic_score, 4))
+                risk_level = "CRITICAL"
+                recommendation = "ESCALATE"
+                verdict = "CRITICAL_AI_CLONE"
+                verdict_label = "Critical: AI Voice Clone Attack"
+            elif speaker_match_score < 0.50:
+                running_risk = round(max(0.70, 0.85 * (1.0 - speaker_match_score)), 4)
+                risk_level = "HIGH"
+                recommendation = "VERIFY_CALLBACK"
+                verdict = "IMPOSTER_MISMATCH"
+                verdict_label = "Warning: Voiceprint Mismatch (Imposter)"
+            else:
+                running_risk = round(max(0.05, 0.25 * synthetic_score + 0.20 * (1.0 - speaker_match_score)), 4)
+                risk_level = "LOW"
+                recommendation = "ALLOW"
+                verdict = "AUTHENTIC_EXECUTIVE"
+                verdict_label = "Authentic Executive Verified"
         else:
-            # No reference speaker profile provided: risk is solely based on synthetic artifact score
+            # General caller without enrolled vault profile: risk driven by synthetic artifacts
             running_risk = synthetic_score
             risk_level, recommendation = self._compute_risk_level_and_recommendation(running_risk)
+            if synthetic_score >= 0.60:
+                verdict = "CRITICAL_AI_CLONE"
+                verdict_label = "Critical: AI Voice Synthesis Detected"
+            else:
+                verdict = "GENERAL_HUMAN"
+                verdict_label = "Natural Human Voice (Unenrolled Caller)"
 
         elapsed_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
         return {
             "syntheticScore": synthetic_score,
-            "speakerMatchScore": speaker_match_score if speaker_match_score is not None else 1.0,
+            "speakerMatchScore": speaker_match_score if speaker_match_score is not None else 0.0,
             "runningRisk": running_risk,
             "riskLevel": risk_level,
             "recommendation": recommendation,
+            "verdict": verdict,
+            "verdictLabel": verdict_label,
             "latencyMs": elapsed_ms,
             "audioDurationSec": round(duration_sec, 3),
             "isSilent": is_silent,

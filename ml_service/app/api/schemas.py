@@ -126,6 +126,12 @@ class VoiceProfileResponse(BaseModel):
     enrolledAt: str = Field(..., description="ISO 8601 UTC timestamp of enrollment")
 
 
+class VoiceProfileListResponse(BaseModel):
+    profiles: List[VoiceProfileResponse] = Field(..., description="List of enrolled voice profiles")
+    total: int = Field(..., description="Total count of enrolled profiles")
+
+
+
 # --- Direct Verification & Synthetic Detection Schemas ---
 class VerifySpeakerRequest(BaseModel):
     audio: str = Field(..., description="Base64-encoded test audio chunk")
@@ -151,6 +157,30 @@ class DetectSyntheticResponse(BaseModel):
     details: Dict[str, Any] = Field(..., description="Vocoder and transformer artifact details")
 
 
+# --- Session Schemas ---
+class StartSessionRequest(BaseModel):
+    profileId: Optional[str] = Field(
+        None,
+        description="The target voiceprint profile ID to verify against"
+    )
+    claimedIdentity: Optional[str] = Field(
+        None,
+        description="Optional alias for target voiceprint profile ID"
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional metadata such as callType, callerNumber, or amount"
+    )
+
+
+class StartSessionResponse(BaseModel):
+    sessionId: str = Field(..., description="Unique generated session identifier")
+    status: str = Field(default="STARTED", description="Status of the session")
+    profileId: Optional[str] = Field(None, description="Enrolled voiceprint profile ID")
+    websocketUrl: Optional[str] = Field(None, description="WebSocket URL for live audio stream")
+    startedAt: str = Field(..., description="ISO 8601 UTC timestamp of session start")
+
+
 # --- System Health Schema ---
 class HealthResponse(BaseModel):
     status: str
@@ -158,3 +188,4 @@ class HealthResponse(BaseModel):
     appVersion: str
     device: str
     modelsLoaded: Dict[str, Any]
+
