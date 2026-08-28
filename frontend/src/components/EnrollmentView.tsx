@@ -31,7 +31,7 @@ import { RAINBOW_PASSAGE_SENTENCES, RAINBOW_PASSAGE_FULL } from '../data/passage
 
 interface EnrollmentViewProps {
   profiles: VoiceProfile[];
-  onRefreshProfiles: () => Promise<void>;
+  onRefreshProfiles: (newProfileId?: string) => Promise<void>;
 }
 
 export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
@@ -259,7 +259,7 @@ export const EnrollmentView: React.FC<EnrollmentViewProps> = ({
       setAudioSamples([]);
       setRecordedDurationSec(0);
       setUploadedFileName(null);
-      await onRefreshProfiles();
+      await onRefreshProfiles(profile.profileId);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMessage(`Enrollment failed: ${msg}`);

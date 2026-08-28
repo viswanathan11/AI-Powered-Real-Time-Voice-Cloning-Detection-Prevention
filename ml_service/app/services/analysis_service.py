@@ -123,7 +123,7 @@ class AnalysisService:
 
         return {
             "syntheticScore": synthetic_score,
-            "speakerMatchScore": speaker_match_score if speaker_match_score is not None else 1.0,
+            "speakerMatchScore": speaker_match_score if speaker_match_score is not None else 0.0,
             "runningRisk": running_risk,
             "riskLevel": risk_level,
             "recommendation": recommendation,

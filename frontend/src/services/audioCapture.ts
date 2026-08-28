@@ -468,15 +468,25 @@ export class AudioCaptureEngine {
     let seq = 1;
 
     for (let i = 0; i < resampled.length; i += chunkSize) {
-      const chunkSamples = new Float32Array(chunkSize);
       const slice = resampled.subarray(i, i + chunkSize);
+      // Ignore residual tail if shorter than 1.0s (16,000 samples) and we already have valid full chunks
+      if (slice.length < 16000 && chunks.length > 0) {
+        break;
+      }
+
+      const chunkSamples = new Float32Array(chunkSize);
       chunkSamples.set(slice);
 
       let sumSq = 0;
-      for (let j = 0; j < chunkSamples.length; j++) {
-        sumSq += chunkSamples[j] * chunkSamples[j];
+      for (let j = 0; j < slice.length; j++) {
+        sumSq += slice[j] * slice[j];
       }
-      const rms = Math.sqrt(sumSq / chunkSamples.length);
+      const rms = Math.sqrt(sumSq / slice.length);
+
+      // If this is a partial chunk at the end and energy is negligible silence, skip it
+      if (slice.length < chunkSize && chunks.length > 0 && rms < 0.008) {
+        break;
+      }
 
       const wavBytes = this.encodeWAV(chunkSamples, this.targetSampleRate);
       const binaryFrame = this.createBinaryFrame(seq, wavBytes);

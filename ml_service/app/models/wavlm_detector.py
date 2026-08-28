@@ -20,8 +20,8 @@ from app.utils.logger import logger
 class AcousticArtifactAnalyzer:
     """
     Robust Acoustic & Spectral Artifact Analyzer designed to catch neural vocoders
-    (HiFi-GAN, MelGAN, VITS, ElevenLabs, Tortoise, etc.) while being immune to
-    laptop microphone fan noise, room hiss, and WebRTC dynamic gain.
+    (HiFi-GAN, MelGAN, BigVGAN, ElevenLabs, Tortoise, VITS, etc.) while being immune to
+    laptop microphone fan noise, room hiss, natural sibilance, and WebRTC dynamic gain.
     """
 
     @staticmethod
@@ -41,8 +41,8 @@ class AcousticArtifactAnalyzer:
             }
 
         # 1. Bandpass filter: 80Hz to 7500Hz (eliminates DC rumble and extreme out-of-band hiss)
+        nyq = sample_rate / 2.0
         try:
-            nyq = sample_rate / 2.0
             b, a = signal.butter(4, [80.0 / nyq, min(7500.0 / nyq, 0.95)], btype='band')
             filtered_audio = signal.filtfilt(b, a, audio_np)
         except Exception:
@@ -54,13 +54,11 @@ class AcousticArtifactAnalyzer:
         f, t, Zxx = signal.stft(filtered_audio, fs=sample_rate, nperseg=n_fft, noverlap=n_fft - hop_length)
         spec = np.abs(Zxx) + 1e-8  # [freq_bins, time_frames]
 
-        # 3. Stationary Noise Floor Estimation (estimate from lowest 20% energy frames)
+        # 3. Stationary Noise Floor Estimation & Subtraction
         frame_energy = np.mean(spec**2, axis=0)
         num_noise_frames = max(2, int(len(frame_energy) * 0.20))
         noise_frame_indices = np.argsort(frame_energy)[:num_noise_frames]
         stationary_noise_spectrum = np.median(spec[:, noise_frame_indices], axis=1, keepdims=True)
-
-        # Spectral subtraction: oversubtraction with a small floor
         spec_clean = np.maximum(spec * 0.02, spec - 1.3 * stationary_noise_spectrum)
 
         # 4. Voicing Detection (speech formants in 200 Hz - 3400 Hz range)
@@ -82,11 +80,6 @@ class AcousticArtifactAnalyzer:
         ratio_per_frame = hf_power / voice_power
         hf_mid_ratio = float(np.mean(ratio_per_frame))
 
-        # Calibrated vocoder anomaly score:
-        # Genuine human speech exhibits steep roll-off: hf_mid_ratio < 0.0010
-        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0080
-        vocoder_score = float(np.clip((hf_mid_ratio - 0.0010) / 0.0070, 0.0, 1.0))
-
         # 6. High-Frequency Spectral Flatness
         hf_active_spec = spec_active[hf_band_mask, :]
         log_hf = np.log(hf_active_spec + 1e-8)
@@ -94,11 +87,10 @@ class AcousticArtifactAnalyzer:
         arith_mean = np.mean(hf_active_spec, axis=0) + 1e-8
         hf_flatness = float(np.mean(geom_mean / arith_mean))
 
-        # Modulate flatness by presence of high-frequency energy
-        flatness_score = float(np.clip((hf_flatness - 0.20) / 0.35, 0.0, 1.0)) * vocoder_score
-
-        # Weighted acoustic vocoder score
-        final_vocoder_score = float(np.clip(0.80 * vocoder_score + 0.20 * flatness_score, 0.0, 1.0))
+        # 7. Calibrated vocoder anomaly score:
+        # Genuine human speech exhibits steep spectral roll-off: hf_mid_ratio < 0.0018
+        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0100
+        vocoder_score = float(np.clip((hf_mid_ratio - 0.0018) / 0.0090, 0.0, 1.0))
 
         # Frame-to-frame spectral flux during active speech
         diff_spec = np.diff(spec_active, axis=1) if spec_active.shape[1] > 1 else np.zeros((spec_active.shape[0], 1))
@@ -108,7 +100,7 @@ class AcousticArtifactAnalyzer:
             "spectral_flux": round(min(spectral_flux, 1.0), 4),
             "hf_mid_ratio": round(hf_mid_ratio, 5),
             "spectral_flatness_hf": round(hf_flatness, 4),
-            "vocoder_artifact_score": round(final_vocoder_score, 4),
+            "vocoder_artifact_score": round(vocoder_score, 4),
             "voiced_frames_count": int(np.sum(active_voiced_frames))
         }
 
@@ -189,16 +181,16 @@ class WavLMDetector:
 
                 with torch.no_grad():
                     outputs = self.wavlm_model(input_values, output_hidden_states=True)
-                    # Layer 3: Acoustic fine structure and phase continuity
+                    # Layer 3: Acoustic fine structure (phase & jitter transitions)
                     l3 = outputs.hidden_states[3].squeeze(0).cpu().numpy()
-                    # Layer 12: Long-range prosody and natural rhythm
+                    # Layer 12: Prosodic & rhythmic dynamics
                     l12 = outputs.hidden_states[12].squeeze(0).cpu().numpy()
 
                     step_mean3 = float(np.mean(np.linalg.norm(np.diff(l3, axis=0), axis=1)))
                     step_mean12 = float(np.mean(np.linalg.norm(np.diff(l12, axis=0), axis=1)))
 
-                # AI vocoders produce over-smooth frame-to-frame transitions (L3 < 1.0, L12 < 0.50)
-                # Natural human speech produces high dynamic variance (L3 > 1.40, L12 > 0.65)
+                # AI vocoders produce over-smooth frame-to-frame transitions (L3 < 1.0, L12 < 0.45)
+                # Natural human speech produces high dynamic variance (L3 > 1.45, L12 > 0.65)
                 smoothness_l3 = float(np.clip((1.35 - step_mean3) / 0.65, 0.0, 1.0))
                 smoothness_l12 = float(np.clip((0.60 - step_mean12) / 0.25, 0.0, 1.0))
                 smoothness_score = float(0.50 * smoothness_l3 + 0.50 * smoothness_l12)
@@ -212,12 +204,17 @@ class WavLMDetector:
         if self.is_fallback:
             final_synthetic_score = vocoder_score
         else:
-            if smoothness_score == 0.0:
+            if smoothness_score == 0.0 and vocoder_score < 0.35:
                 # High acoustic entropy proves natural human vocal tract dynamics (immune to mic noise)
                 final_synthetic_score = 0.0
+            elif smoothness_score > 0.60 or vocoder_score > 0.60:
+                final_synthetic_score = float(np.clip(
+                    0.60 * smoothness_score + 0.40 * vocoder_score,
+                    0.0, 1.0
+                ))
             else:
                 final_synthetic_score = float(np.clip(
-                    vocoder_score * (0.35 + 0.65 * smoothness_score) + 0.30 * smoothness_score,
+                    vocoder_score * 0.40 + smoothness_score * 0.30,
                     0.0, 1.0
                 ))
 

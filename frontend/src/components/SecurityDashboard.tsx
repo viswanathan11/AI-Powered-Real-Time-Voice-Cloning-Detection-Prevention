@@ -35,32 +35,73 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
   callerNumber,
   amount,
 }) => {
-  const riskScore = currentResult ? currentResult.runningRisk : 0.0;
-  const riskLevel = currentResult ? currentResult.riskLevel : 'LOW';
-  const recommendation = currentResult ? currentResult.recommendation : 'ALLOW';
-  const syntheticScore = currentResult ? currentResult.syntheticScore : 0.0;
-  const speakerMatchScore = currentResult ? currentResult.speakerMatchScore : 1.0;
+  // Active speech chunks (filter out any silent chunks if present)
+  const activeChunks = chunkHistory.filter((c) => !c.isSilent);
+  const evaluatedChunks = activeChunks.length > 0 ? activeChunks : chunkHistory;
+
+  // When stream is finished, compute aggregate / mean across active speech chunks
+  const isFinished = !isStreaming && evaluatedChunks.length > 0;
+  const avgSpeakerMatch = evaluatedChunks.length > 0
+    ? evaluatedChunks.reduce((acc, c) => acc + c.speakerMatchScore, 0) / evaluatedChunks.length
+    : (currentResult ? currentResult.speakerMatchScore : 0.0);
+  const avgSynthetic = evaluatedChunks.length > 0
+    ? evaluatedChunks.reduce((acc, c) => acc + c.syntheticScore, 0) / evaluatedChunks.length
+    : (currentResult ? currentResult.syntheticScore : 0.0);
+
+  const speakerMatchScore = isFinished ? avgSpeakerMatch : (currentResult ? currentResult.speakerMatchScore : 0.0);
+  const syntheticScore = isFinished ? avgSynthetic : (currentResult ? currentResult.syntheticScore : 0.0);
+
+  const riskScore = isFinished
+    ? (syntheticScore >= 0.60
+        ? Math.max(0.85, syntheticScore)
+        : (speakerMatchScore < 0.50
+            ? Math.max(0.70, 0.85 * (1.0 - speakerMatchScore))
+            : Math.max(0.05, 0.25 * syntheticScore + 0.20 * (1.0 - speakerMatchScore))))
+    : (currentResult ? currentResult.runningRisk : 0.0);
+
+  const riskLevel = isFinished
+    ? (riskScore >= 0.70 ? 'CRITICAL' : riskScore >= 0.40 ? 'HIGH' : riskScore >= 0.20 ? 'MEDIUM' : 'LOW')
+    : (currentResult ? currentResult.riskLevel : 'LOW');
+
+  const recommendation = isFinished
+    ? (riskLevel === 'CRITICAL' ? 'ESCALATE' : riskLevel === 'HIGH' ? 'VERIFY_CALLBACK' : 'ALLOW')
+    : (currentResult ? currentResult.recommendation : 'ALLOW');
+
   const cosineSim = currentResult?.cosineSimilarity !== undefined && currentResult.cosineSimilarity !== null
     ? currentResult.cosineSimilarity
-    : currentResult ? (speakerMatchScore > 0.8 ? 0.98 : speakerMatchScore * 0.7) : 0.0;
+    : currentResult ? (speakerMatchScore > 0.8 ? 0.98 : speakerMatchScore * 0.7) : null;
   const latencyMs = currentResult ? currentResult.latencyMs : 0;
-  const verdict = currentResult?.verdict || 'AWAITING_SPEECH';
-  const verdictLabel = currentResult?.verdictLabel || 'System Ready / Monitoring Stream';
+
+  let verdict = isFinished
+    ? (syntheticScore >= 0.60
+        ? 'CRITICAL_AI_CLONE'
+        : (speakerMatchScore < 0.50
+            ? 'IMPOSTER_MISMATCH'
+            : 'AUTHENTIC_EXECUTIVE'))
+    : (currentResult?.verdict || 'AWAITING_SPEECH');
+
+  let verdictLabel = isFinished
+    ? (verdict === 'CRITICAL_AI_CLONE'
+        ? 'Critical: AI Voice Clone Attack'
+        : (verdict === 'IMPOSTER_MISMATCH'
+            ? 'Warning: Voiceprint Mismatch (Imposter)'
+            : 'Authentic Executive Verified'))
+    : (currentResult?.verdictLabel || 'System Ready / Monitoring Stream');
 
   // Dynamic Verdict Styling
   let verdictBorder = 'border-slate-800 bg-slate-950/60 text-slate-300';
   let verdictIcon = <Activity className="w-5 h-5 text-cyan-400" />;
   let verdictBadge = 'bg-slate-800 text-slate-400';
 
-  if (verdict === 'CRITICAL_AI_CLONE' || riskScore >= 0.75) {
+  if (verdict === 'CRITICAL_AI_CLONE' || (currentResult && riskScore >= 0.75)) {
     verdictBorder = 'border-rose-500/50 bg-gradient-to-r from-rose-950/60 via-slate-950/80 to-rose-950/40 text-rose-200 shadow-lg shadow-rose-950/40';
     verdictIcon = <Flame className="w-5 h-5 text-rose-400 animate-pulse" />;
     verdictBadge = 'bg-rose-500/25 text-rose-300 border border-rose-500/40';
-  } else if (verdict === 'IMPOSTER_MISMATCH' || (riskScore >= 0.50 && speakerMatchScore < 0.50)) {
+  } else if (verdict === 'IMPOSTER_MISMATCH' || (currentResult && riskScore >= 0.50 && speakerMatchScore < 0.50)) {
     verdictBorder = 'border-amber-500/50 bg-gradient-to-r from-amber-950/60 via-slate-950/80 to-amber-950/40 text-amber-200 shadow-lg shadow-amber-950/40';
     verdictIcon = <AlertTriangle className="w-5 h-5 text-amber-400 animate-pulse" />;
     verdictBadge = 'bg-amber-500/25 text-amber-300 border border-amber-500/40';
-  } else if (verdict === 'AUTHENTIC_EXECUTIVE' || (speakerMatchScore >= 0.70 && syntheticScore < 0.35)) {
+  } else if (verdict === 'AUTHENTIC_EXECUTIVE' || (currentResult && speakerMatchScore >= 0.70 && syntheticScore < 0.35)) {
     verdictBorder = 'border-emerald-500/40 bg-gradient-to-r from-emerald-950/50 via-slate-950/80 to-emerald-950/30 text-emerald-200 shadow-lg shadow-emerald-950/30';
     verdictIcon = <CheckCircle2 className="w-5 h-5 text-emerald-400" />;
     verdictBadge = 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40';
@@ -130,14 +171,14 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
                 {verdictLabel}
               </span>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${verdictBadge}`}>
-                {riskLevel} RISK
+                {currentResult ? `${riskLevel} RISK` : 'STANDBY'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5 font-sans">
               {verdict === 'CRITICAL_AI_CLONE' && 'Deepfake clone detected. Neural vocoder signature identified with >80% probability.'}
               {verdict === 'IMPOSTER_MISMATCH' && `Caller voiceprint does not match the enrolled profile for "${selectedProfile?.personName || 'Executive'}".`}
               {verdict === 'AUTHENTIC_EXECUTIVE' && `Speaker identity mathematically confirmed against Voice Vault (${(speakerMatchScore * 100).toFixed(1)}% match).`}
-              {verdict === 'AWAITING_SPEECH' && 'Stream connected. Awaiting active speech chunks to begin neural inference.'}
+              {verdict === 'AWAITING_SPEECH' && (isStreaming ? 'Stream connected. Awaiting active speech chunks to begin neural inference.' : 'System ready. Select a profile and start stream or run simulation to begin verification.')}
               {verdict === 'GENERAL_HUMAN' && 'Natural human speech patterns observed. No reference vault profile attached.'}
             </p>
           </div>
@@ -145,7 +186,7 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
 
         <div className="shrink-0 flex items-center gap-2 self-end sm:self-center">
           <span className="text-[11px] font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-950/80 border border-white/10 text-white shadow-sm">
-            PROTOCOL: {recommendation}
+            PROTOCOL: {currentResult ? recommendation : 'IDLE'}
           </span>
         </div>
       </div>
@@ -191,41 +232,45 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
               </div>
               <span
                 className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
-                  syntheticScore >= 0.60
+                  !currentResult
+                    ? 'bg-slate-800/50 border-slate-700/50 text-slate-400'
+                    : syntheticScore >= 0.60
                     ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
                     : syntheticScore >= 0.30
                     ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                     : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                 }`}
               >
-                {(syntheticScore * 100).toFixed(1)}% Synthetic
+                {currentResult ? `${(syntheticScore * 100).toFixed(1)}% Synthetic` : '0.0% Synthetic'}
               </span>
             </div>
 
             <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden p-0.5">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  syntheticScore >= 0.60
+                  !currentResult
+                    ? 'bg-slate-700'
+                    : syntheticScore >= 0.60
                     ? 'bg-gradient-to-r from-amber-500 to-rose-500'
                     : syntheticScore >= 0.30
                     ? 'bg-amber-400'
                     : 'bg-emerald-400'
                 }`}
-                style={{ width: `${Math.min(100, Math.max(0, syntheticScore * 100))}%` }}
+                style={{ width: `${currentResult ? Math.min(100, Math.max(0, syntheticScore * 100)) : 0}%` }}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 pt-0.5 border-t border-slate-900">
               <div className="flex justify-between">
                 <span>Vocoder Artifact:</span>
-                <span className={syntheticScore >= 0.60 ? 'text-rose-400 font-bold' : 'text-slate-300'}>
-                  {syntheticScore >= 0.60 ? '🔴 Detected (>85%)' : '🟢 Clean Human'}
+                <span className={!currentResult ? 'text-slate-400' : syntheticScore >= 0.60 ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                  {!currentResult ? '⚪ Standby' : syntheticScore >= 0.60 ? '🔴 Detected (>85%)' : '🟢 Clean Human'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Transition Entropy:</span>
-                <span className={syntheticScore >= 0.60 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
-                  {syntheticScore >= 0.60 ? '⚠️ Over-smooth (TTS)' : '🟢 Natural Organic'}
+                <span className={!currentResult ? 'text-slate-400' : syntheticScore >= 0.60 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
+                  {!currentResult ? '⚪ Standby' : syntheticScore >= 0.60 ? '⚠️ Over-smooth (TTS)' : '🟢 Natural Organic'}
                 </span>
               </div>
             </div>
@@ -247,27 +292,31 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
               </div>
               <span
                 className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
-                  speakerMatchScore >= 0.70
+                  !currentResult
+                    ? 'bg-slate-800/50 border-slate-700/50 text-slate-400'
+                    : speakerMatchScore >= 0.70
                     ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
                     : speakerMatchScore >= 0.40
                     ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                     : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
                 }`}
               >
-                {(speakerMatchScore * 100).toFixed(1)}% Match
+                {currentResult ? `${(speakerMatchScore * 100).toFixed(1)}% Match` : '0.0% Match'}
               </span>
             </div>
 
             <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden p-0.5">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  speakerMatchScore >= 0.70
+                  !currentResult
+                    ? 'bg-slate-700'
+                    : speakerMatchScore >= 0.70
                     ? 'bg-emerald-400'
                     : speakerMatchScore >= 0.40
                     ? 'bg-amber-400'
                     : 'bg-rose-500'
                 }`}
-                style={{ width: `${Math.min(100, Math.max(0, speakerMatchScore * 100))}%` }}
+                style={{ width: `${currentResult ? Math.min(100, Math.max(0, speakerMatchScore * 100)) : 0}%` }}
               />
             </div>
 
@@ -280,7 +329,7 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
               </div>
               <div className="flex justify-between">
                 <span>Raw Cosine Sim:</span>
-                <span className={`font-bold ${cosineSim >= 0.74 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`font-bold ${cosineSim !== null && cosineSim >= 0.74 ? 'text-emerald-400' : cosineSim !== null ? 'text-amber-400' : 'text-slate-400'}`}>
                   {typeof cosineSim === 'number' ? cosineSim.toFixed(3) : 'N/A'}
                 </span>
               </div>

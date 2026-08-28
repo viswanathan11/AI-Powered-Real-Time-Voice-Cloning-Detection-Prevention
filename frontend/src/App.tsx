@@ -44,11 +44,13 @@ export const App: React.FC = () => {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
 
   // Load profiles and system health on mount
-  const refreshProfiles = useCallback(async () => {
+  const refreshProfiles = useCallback(async (newProfileId?: string) => {
     try {
       const res = await api.listProfiles();
       setProfiles(res.profiles || []);
-      if (res.profiles && res.profiles.length > 0 && !selectedProfileId) {
+      if (newProfileId) {
+        setSelectedProfileId(newProfileId);
+      } else if (res.profiles && res.profiles.length > 0 && !selectedProfileId) {
         setSelectedProfileId(res.profiles[0].profileId);
       }
     } catch (err) {

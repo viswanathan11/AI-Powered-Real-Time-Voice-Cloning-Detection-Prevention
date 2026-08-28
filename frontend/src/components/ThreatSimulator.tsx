@@ -115,11 +115,10 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         audioCaptureEngine.stop();
       }
 
-      // For preset attacks and live calls, ensure a claimed profile is targeted
+      // Ensure a claimed profile is targeted
       let profileToClaim = selectedProfileId;
       if (!profileToClaim && profiles.length > 0) {
-        const matched = profiles.find((p) => p.personName.toLowerCase().includes('ramesh')) || profiles[0];
-        profileToClaim = matched.profileId;
+        profileToClaim = profiles[0].profileId;
         onSelectProfileId(profileToClaim);
       }
 
