@@ -35,6 +35,22 @@ class AnalyzeChunkResponse(BaseModel):
         ...,
         description="Score between 0.0 (different speaker) and 1.0 (matching enrolled speaker)"
     )
+    speakerDecision: Optional[str] = Field(
+        default="MATCH",
+        description="Discrete verification decision: MATCH, MISMATCH, UNCERTAIN"
+    )
+    audioQuality: Optional[str] = Field(
+        default="GOOD",
+        description="Acoustic quality assessment: GOOD, POOR_QUALITY, INSUFFICIENT_SPEECH"
+    )
+    evidenceConfidence: Optional[float] = Field(
+        default=1.0,
+        description="Confidence score [0.0, 1.0] based on audio quality and speech clarity"
+    )
+    classification: Optional[str] = Field(
+        default="GENUINE",
+        description="Triage classification: GENUINE, HUMAN_IMPERSONATOR, AI_CLONE_SUSPECTED, UNCERTAIN"
+    )
     runningRisk: float = Field(
         ...,
         description="Composite risk score computed from syntheticScore and speaker mismatch"
@@ -47,6 +63,14 @@ class AnalyzeChunkResponse(BaseModel):
         ...,
         description="Actionable mitigation advice: ALLOW, MONITOR, VERIFY_CALLBACK, ESCALATE"
     )
+    verdict: Optional[str] = Field(
+        default="AUTHENTIC_EXECUTIVE",
+        description="Triage verdict code"
+    )
+    verdictLabel: Optional[str] = Field(
+        default="Authentic Executive Verified",
+        description="Human-readable verdict description"
+    )
     latencyMs: float = Field(
         ...,
         description="Total ML inference processing time in milliseconds"
@@ -58,6 +82,18 @@ class AnalyzeChunkResponse(BaseModel):
     isSilent: bool = Field(
         ...,
         description="True if audio chunk contains silence or low background noise"
+    )
+    rmsEnergy: Optional[float] = Field(
+        default=None,
+        description="Root mean square energy of the chunk"
+    )
+    cosineSimilarity: Optional[float] = Field(
+        default=None,
+        description="Raw cosine similarity between chunk and target embedding"
+    )
+    qualityDetails: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Physical audio quality metrics (SNR, clipping, speech ratio)"
     )
     details: Optional[Dict[str, Any]] = Field(
         default=None,

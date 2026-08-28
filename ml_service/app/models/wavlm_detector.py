@@ -35,6 +35,7 @@ class AcousticArtifactAnalyzer:
             return {
                 "spectral_flux": 0.0,
                 "hf_mid_ratio": 0.0,
+                "high_freq_ratio": 0.0,
                 "spectral_flatness_hf": 0.0,
                 "vocoder_artifact_score": 0.0,
                 "voiced_frames_count": 0
@@ -84,8 +85,8 @@ class AcousticArtifactAnalyzer:
 
         # Calibrated vocoder anomaly score:
         # Genuine human speech exhibits steep roll-off: hf_mid_ratio < 0.0010
-        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0080
-        vocoder_score = float(np.clip((hf_mid_ratio - 0.0010) / 0.0070, 0.0, 1.0))
+        # Neural vocoders (HiFi-GAN, ElevenLabs) generate unvoiced dispersion: hf_mid_ratio > 0.0070
+        vocoder_score = float(np.clip((hf_mid_ratio - 0.0010) / 0.0065, 0.0, 1.0))
 
         # 6. High-Frequency Spectral Flatness
         hf_active_spec = spec_active[hf_band_mask, :]
@@ -107,6 +108,7 @@ class AcousticArtifactAnalyzer:
         return {
             "spectral_flux": round(min(spectral_flux, 1.0), 4),
             "hf_mid_ratio": round(hf_mid_ratio, 5),
+            "high_freq_ratio": round(hf_mid_ratio, 5),
             "spectral_flatness_hf": round(hf_flatness, 4),
             "vocoder_artifact_score": round(final_vocoder_score, 4),
             "voiced_frames_count": int(np.sum(active_voiced_frames))
@@ -163,7 +165,7 @@ class WavLMDetector:
                 "synthetic_score": 0.0,
                 "is_synthetic": False,
                 "confidence": 1.0,
-                "vocoder_score": 0.0,
+                "vocoder_artifact_score": 0.0,
                 "smoothness_score": 0.0,
                 "note": "Silent or near-silent chunk"
             }
@@ -172,10 +174,12 @@ class WavLMDetector:
         acoustic_metrics = AcousticArtifactAnalyzer.extract_acoustic_artifact_scores(waveform, sample_rate)
         vocoder_score = acoustic_metrics["vocoder_artifact_score"]
 
-        # 2. Extract WavLM Multi-Layer Representation Dynamics (L3 acoustic + L12 prosodic)
-        smoothness_score = 0.0
+        # 2. Extract WavLM Multi-Layer Representation Dynamics
+        wavlm_neural_score = 0.0
+        step_mean1 = 2.50
         step_mean3 = 1.95
         step_mean12 = 0.90
+        layer1_var = 0.0080
 
         if not self.is_fallback and self.wavlm_model is not None and self.feature_extractor is not None:
             try:
@@ -189,37 +193,44 @@ class WavLMDetector:
 
                 with torch.no_grad():
                     outputs = self.wavlm_model(input_values, output_hidden_states=True)
+                    # Layer 1: Low-level acoustic micro-structures & glottal pulses
+                    l1 = outputs.hidden_states[1].squeeze(0).cpu().numpy()
                     # Layer 3: Acoustic fine structure and phase continuity
                     l3 = outputs.hidden_states[3].squeeze(0).cpu().numpy()
                     # Layer 12: Long-range prosody and natural rhythm
                     l12 = outputs.hidden_states[12].squeeze(0).cpu().numpy()
 
+                    step_mean1 = float(np.mean(np.linalg.norm(np.diff(l1, axis=0), axis=1)))
                     step_mean3 = float(np.mean(np.linalg.norm(np.diff(l3, axis=0), axis=1)))
                     step_mean12 = float(np.mean(np.linalg.norm(np.diff(l12, axis=0), axis=1)))
+                    layer1_var = float(np.mean(np.var(l1, axis=0)))
 
-                # AI vocoders produce over-smooth frame-to-frame transitions (L3 < 1.0, L12 < 0.50)
-                # Natural human speech produces high dynamic variance (L3 > 1.40, L12 > 0.65)
-                smoothness_l3 = float(np.clip((1.35 - step_mean3) / 0.65, 0.0, 1.0))
-                smoothness_l12 = float(np.clip((0.60 - step_mean12) / 0.25, 0.0, 1.0))
-                smoothness_score = float(0.50 * smoothness_l3 + 0.50 * smoothness_l12)
+                # AI synthesizers & vocoders produce over-smooth transitions across frames
+                # Natural human speech produces high dynamic variance and velocity
+                score_l1 = float(np.clip((1.55 - step_mean1) / 0.55, 0.0, 1.0))
+                score_l3 = float(np.clip((1.25 - step_mean3) / 0.45, 0.0, 1.0))
+                score_l12 = float(np.clip((0.46 - step_mean12) / 0.16, 0.0, 1.0))
+                score_var = float(np.clip((0.0035 - layer1_var) / 0.0022, 0.0, 1.0))
+
+                wavlm_neural_score = float(0.35 * score_l1 + 0.30 * score_l3 + 0.15 * score_l12 + 0.20 * score_var)
             except Exception as e:
                 logger.error(f"Error during WavLM forward pass: {e}")
-                smoothness_score = vocoder_score
+                wavlm_neural_score = vocoder_score
 
         # 3. Gated Multi-Feature Ensemble
-        # AI Voice Clone: has high vocoder dispersion AND unnatural temporal smoothness
-        # Natural Human Speech: high temporal dynamic entropy (smoothness == 0.0)
+        # When both vocoder artifacts and WavLM neural smoothness indicate synthesis: high synthetic score.
+        # When neither indicates synthesis: clean 0.0.
         if self.is_fallback:
             final_synthetic_score = vocoder_score
         else:
-            if smoothness_score == 0.0:
-                # High acoustic entropy proves natural human vocal tract dynamics (immune to mic noise)
+            if wavlm_neural_score > 0.20 and vocoder_score > 0.20:
+                final_synthetic_score = float(np.clip(0.50 * wavlm_neural_score + 0.50 * vocoder_score + 0.10, 0.0, 1.0))
+            elif wavlm_neural_score > 0.50 or vocoder_score > 0.50:
+                final_synthetic_score = float(np.clip(max(0.70 * wavlm_neural_score, 0.80 * vocoder_score), 0.0, 1.0))
+            elif wavlm_neural_score < 0.15 and vocoder_score < 0.15:
                 final_synthetic_score = 0.0
             else:
-                final_synthetic_score = float(np.clip(
-                    vocoder_score * (0.35 + 0.65 * smoothness_score) + 0.30 * smoothness_score,
-                    0.0, 1.0
-                ))
+                final_synthetic_score = float(np.clip(0.40 * wavlm_neural_score + 0.40 * vocoder_score, 0.0, 1.0))
 
         final_synthetic_score = round(float(np.clip(final_synthetic_score, 0.0, 1.0)), 4)
         is_synthetic = final_synthetic_score >= settings.SYNTHETIC_SCORE_THRESHOLD
@@ -228,9 +239,18 @@ class WavLMDetector:
             "synthetic_score": final_synthetic_score,
             "is_synthetic": is_synthetic,
             "vocoder_artifact_score": round(vocoder_score, 4),
-            "smoothness_score": round(smoothness_score, 4),
+            "smoothness_score": round(wavlm_neural_score, 4),
+            "wavlm_l1_velocity": round(step_mean1, 4),
             "wavlm_l3_velocity": round(step_mean3, 4),
             "wavlm_l12_velocity": round(step_mean12, 4),
+            "wavlm_variance": round(layer1_var, 6),
+            "model_metadata": {
+                "model_id": settings.WAVLM_MODEL_ID,
+                "model_type": "wavlm_acoustic_dynamics_backbone",
+                "is_fallback": self.is_fallback,
+                "is_fine_tuned_classifier": False,
+                "detection_method": "layer_temporal_entropy_and_spectral_heuristics"
+            },
             "acoustic_artifacts": acoustic_metrics
         }
 

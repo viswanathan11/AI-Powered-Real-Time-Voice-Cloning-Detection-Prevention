@@ -157,23 +157,55 @@ class ECAPAVerifier:
         """
         Calibrates raw ECAPA cosine similarity into an intuitive speaker match probability [0.0, 1.0].
         Standard SpeechBrain VoxCeleb ECAPA thresholds:
-          cosine >= 0.75 -> High confidence genuine match (> 80%)
-          cosine ~ 0.67 -> Decision boundary (50%)
-          cosine < 0.58 -> Strong non-match / different speaker (< 20%)
+          cosine >= 0.85 -> High confidence genuine match (> 88%)
+          cosine ~ 0.74 -> Decision boundary (50%)
+          cosine <= 0.67 -> Strong non-match / different speaker (< 22%)
         """
-        calibrated = 1.0 / (1.0 + np.exp(-14.0 * (cosine_sim - 0.67)))
+        calibrated = 1.0 / (1.0 + np.exp(-18.0 * (cosine_sim - 0.74)))
         return float(np.clip(calibrated, 0.0, 1.0))
+
+    def classify_speaker_decision(self, cosine_sim: float, quality: str = "GOOD") -> str:
+        """
+        Maps cosine similarity and audio quality to a discrete verification decision:
+        - 'MATCH': cosine >= 0.78 and audio is usable
+        - 'MISMATCH': cosine < 0.70 and audio is usable
+        - 'UNCERTAIN': 0.70 <= cosine < 0.78 or audio is INSUFFICIENT_SPEECH / POOR_QUALITY
+        """
+        if quality == "INSUFFICIENT_SPEECH":
+            return "UNCERTAIN"
+        if cosine_sim >= 0.78:
+            return "MATCH"
+        elif cosine_sim < 0.70:
+            return "MISMATCH"
+        else:
+            return "UNCERTAIN"
 
     def average_embeddings(self, embeddings: List[Union[np.ndarray, List[float]]]) -> np.ndarray:
         """
         Computes the mean speaker embedding across multiple enrolled voice samples
-        and normalizes it to unit length.
+        with outlier filtering, and normalizes the centroid to unit length.
         """
         if not embeddings:
             raise ValueError("No embeddings provided to average")
 
         emb_matrix = np.array([np.array(e, dtype=np.float32).flatten() for e in embeddings])
-        mean_emb = np.mean(emb_matrix, axis=0)
+        if len(emb_matrix) == 1:
+            mean_emb = emb_matrix[0]
+        elif len(emb_matrix) >= 3:
+            # Check pairwise consistency with initial mean
+            initial_mean = np.mean(emb_matrix, axis=0)
+            norm_init = np.linalg.norm(initial_mean)
+            if norm_init > 1e-8:
+                initial_mean = initial_mean / norm_init
+            sims = np.dot(emb_matrix, initial_mean)
+            # Filter extreme outliers (< 0.50 similarity with centroid)
+            valid_mask = sims >= 0.50
+            if np.any(valid_mask):
+                mean_emb = np.mean(emb_matrix[valid_mask], axis=0)
+            else:
+                mean_emb = initial_mean
+        else:
+            mean_emb = np.mean(emb_matrix, axis=0)
 
         norm = np.linalg.norm(mean_emb)
         if norm > 1e-8:

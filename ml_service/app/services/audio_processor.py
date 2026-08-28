@@ -131,5 +131,76 @@ class AudioProcessor:
             padding = torch.zeros((waveform.shape[0], target_samples - current_samples), dtype=waveform.dtype)
             return torch.cat([waveform, padding], dim=-1)
 
+    def assess_audio_quality(self, waveform: torch.Tensor, sample_rate: int = 16000) -> dict:
+        """
+        Assesses the physical acoustic quality of an audio chunk for verification reliability.
+        Calculates duration, RMS energy, clipping ratio, active speech frame ratio, and estimated SNR.
+        Returns quality status ('GOOD', 'POOR_QUALITY', 'INSUFFICIENT_SPEECH') and confidence multiplier [0.0, 1.0].
+        """
+        audio_np = waveform.squeeze().cpu().numpy()
+        duration_sec = float(len(audio_np) / sample_rate)
+
+        if len(audio_np) < 400:
+            return {
+                "durationSec": round(duration_sec, 3),
+                "rmsEnergy": 0.0,
+                "snrDb": 0.0,
+                "clippingRatio": 0.0,
+                "speechRatio": 0.0,
+                "quality": "INSUFFICIENT_SPEECH",
+                "isUsable": False,
+                "confidenceMultiplier": 0.0
+            }
+
+        rms = float(np.sqrt(np.mean(audio_np ** 2)))
+        clipping_count = np.sum(np.abs(audio_np) >= 0.995)
+        clipping_ratio = float(clipping_count / len(audio_np))
+
+        # Frame-level RMS (25ms window, 10ms hop)
+        frame_len = int(sample_rate * 0.025)
+        hop_len = int(sample_rate * 0.010)
+        num_frames = (len(audio_np) - frame_len) // hop_len + 1
+
+        if num_frames > 0:
+            frames = np.lib.stride_tricks.sliding_window_view(audio_np, frame_len)[::hop_len]
+            frame_rms = np.sqrt(np.mean(frames ** 2, axis=1) + 1e-10)
+
+            # Active speech frames have RMS above silence threshold
+            active_speech_mask = frame_rms >= settings.SILENCE_RMS_THRESHOLD
+            speech_ratio = float(np.sum(active_speech_mask) / len(active_speech_mask))
+
+            num_noise = max(1, int(len(frame_rms) * 0.15))
+            noise_floor_rms = np.mean(np.sort(frame_rms)[:num_noise])
+            signal_rms = np.mean(frame_rms[active_speech_mask]) if np.any(active_speech_mask) else noise_floor_rms
+            snr_db = float(20.0 * np.log10(max(1.0, signal_rms / (noise_floor_rms + 1e-6))))
+        else:
+            speech_ratio = 1.0 if rms >= settings.SILENCE_RMS_THRESHOLD else 0.0
+            snr_db = 20.0 if rms >= settings.SILENCE_RMS_THRESHOLD else 0.0
+
+        # Classification
+        if rms < settings.SILENCE_RMS_THRESHOLD or duration_sec < settings.MIN_AUDIO_DURATION_SEC or speech_ratio < 0.15:
+            quality = "INSUFFICIENT_SPEECH"
+            is_usable = False
+            confidence = 0.0
+        elif clipping_ratio > 0.08 or (snr_db < 3.0 and speech_ratio < 0.40):
+            quality = "POOR_QUALITY"
+            is_usable = True
+            confidence = 0.50
+        else:
+            quality = "GOOD"
+            is_usable = True
+            confidence = 1.0
+
+        return {
+            "durationSec": round(duration_sec, 3),
+            "rmsEnergy": round(rms, 5),
+            "snrDb": round(snr_db, 2),
+            "clippingRatio": round(clipping_ratio, 4),
+            "speechRatio": round(speech_ratio, 3),
+            "quality": quality,
+            "isUsable": is_usable,
+            "confidenceMultiplier": confidence
+        }
+
 
 audio_processor = AudioProcessor()

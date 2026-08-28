@@ -57,7 +57,7 @@ class ModelManager:
                     "embedding_dim": settings.SPEAKER_EMBEDDING_DIM
                 },
                 "wavlm_detector": {
-                    "loaded": self.wavlm.classifier_head is not None,
+                    "loaded": (self.wavlm.wavlm_model is not None) or self.wavlm.is_fallback,
                     "is_fallback": self.wavlm.is_fallback,
                     "threshold": settings.SYNTHETIC_SCORE_THRESHOLD
                 }

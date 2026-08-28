@@ -30,37 +30,49 @@ class RiskEngine:
         synthetic_score: float,
         speaker_match_score: float,
         has_enrolled_profile: bool = True
-    ) -> Tuple[float, str, str]:
+    ) -> float:
         """
-        Calculates raw composite risk based on 3-way triage:
-        1. AI Voice Clone (synthetic >= 0.60): Critical Risk [0.85 - 1.0]
-        2. Human Imposter (match < 0.50): High Risk [0.70 - 0.90]
-        3. Authentic Voice (match >= 0.50, synthetic < 0.35): Low Risk [0.05 - 0.20]
-        4. General caller: Pure synthetic score
+        Calculates raw composite risk based on weights:
+          rawRisk = synthetic_weight * synthetic_score + speaker_mismatch_weight * (1 - speaker_match_score)
         """
         synthetic_score = max(0.0, min(1.0, float(synthetic_score)))
         speaker_match_score = max(0.0, min(1.0, float(speaker_match_score)))
 
         if not has_enrolled_profile:
-            verdict = "CRITICAL_AI_CLONE" if synthetic_score >= 0.60 else "GENERAL_HUMAN"
-            label = "Critical: AI Voice Synthesis" if synthetic_score >= 0.60 else "Natural Human Voice (Unenrolled)"
-            return round(synthetic_score, 4), verdict, label
+            return round(synthetic_score, 4)
 
-        # 3-Way Triage Evaluation
+        raw_risk = (
+            self.synthetic_weight * synthetic_score +
+            self.speaker_mismatch_weight * (1.0 - speaker_match_score)
+        )
+        return round(float(max(0.0, min(1.0, raw_risk))), 4)
+
+    def evaluate_verdict(
+        self,
+        synthetic_score: float,
+        speaker_match_score: float,
+        has_enrolled_profile: bool = True,
+        is_silent: bool = False
+    ) -> Tuple[str, str]:
+        """
+        Computes 3-way triage verdict and human-readable label:
+        1. AI Voice Clone (synthetic >= 0.60): Critical Risk
+        2. Human Imposter (match < 0.50): High Risk
+        3. Authentic Voice (match >= 0.50, synthetic < 0.35): Low Risk
+        """
+        if is_silent:
+            return "AWAITING_SPEECH", "Silence / Speech Pause"
+        if not has_enrolled_profile:
+            if synthetic_score >= 0.60:
+                return "CRITICAL_AI_CLONE", "Critical: AI Voice Synthesis"
+            return "GENERAL_HUMAN", "Natural Human Voice (Unenrolled)"
+
         if synthetic_score >= settings.SYNTHETIC_SCORE_THRESHOLD or synthetic_score >= 0.60:
-            raw_risk = max(0.85, synthetic_score)
-            verdict = "CRITICAL_AI_CLONE"
-            label = "Critical: AI Voice Clone Attack"
+            return "CRITICAL_AI_CLONE", "Critical: AI Voice Clone Attack"
         elif speaker_match_score < 0.50:
-            raw_risk = max(0.70, round(0.85 * (1.0 - speaker_match_score), 4))
-            verdict = "IMPOSTER_MISMATCH"
-            label = "Warning: Voiceprint Mismatch (Imposter)"
+            return "IMPOSTER_MISMATCH", "Warning: Voiceprint Mismatch (Imposter)"
         else:
-            raw_risk = max(0.05, round(0.25 * synthetic_score + 0.20 * (1.0 - speaker_match_score), 4))
-            verdict = "AUTHENTIC_EXECUTIVE"
-            label = "Authentic Executive Verified"
-
-        return max(0.0, min(1.0, round(raw_risk, 4))), verdict, label
+            return "AUTHENTIC_EXECUTIVE", "Authentic Executive Verified"
 
     def apply_contextual_modifiers(
         self,
@@ -127,11 +139,17 @@ class RiskEngine:
                 "reason": "Silence detected in chunk"
             }
 
-        # 1. Compute 3-way triage risk
-        raw_risk, verdict, verdict_label = self.calculate_raw_risk(
+        # 1. Compute raw risk and verdict
+        raw_risk = self.calculate_raw_risk(
             synthetic_score=synthetic_score,
             speaker_match_score=speaker_match_score,
             has_enrolled_profile=has_enrolled_profile
+        )
+        verdict, verdict_label = self.evaluate_verdict(
+            synthetic_score=synthetic_score,
+            speaker_match_score=speaker_match_score,
+            has_enrolled_profile=has_enrolled_profile,
+            is_silent=False
         )
 
         # 2. Apply contextual risk adjustments

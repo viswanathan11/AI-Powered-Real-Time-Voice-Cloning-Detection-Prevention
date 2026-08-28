@@ -76,6 +76,28 @@ class TestAudioProcessor(unittest.TestCase):
         trimmed = self.processor.pad_or_trim(long_tensor, target_duration_sec=1.0)
         self.assertEqual(trimmed.shape[1], 16000)
 
+    def test_assess_audio_quality_good_audio(self):
+        b64_audio = self._create_sine_wave_b64(freq=440.0, duration=2.0, sr=16000, amplitude=0.4)
+        waveform, sr, _, _ = self.processor.decode_base64_audio(b64_audio)
+        q = self.processor.assess_audio_quality(waveform, sample_rate=sr)
+        self.assertEqual(q["quality"], "GOOD")
+        self.assertTrue(q["isUsable"])
+        self.assertEqual(q["confidenceMultiplier"], 1.0)
+
+    def test_assess_audio_quality_insufficient_speech(self):
+        b64_silent = self._create_sine_wave_b64(freq=440.0, duration=1.0, sr=16000, amplitude=0.0001)
+        waveform, sr, _, _ = self.processor.decode_base64_audio(b64_silent)
+        q = self.processor.assess_audio_quality(waveform, sample_rate=sr)
+        self.assertEqual(q["quality"], "INSUFFICIENT_SPEECH")
+        self.assertFalse(q["isUsable"])
+        self.assertEqual(q["confidenceMultiplier"], 0.0)
+
+    def test_assess_audio_quality_short_audio(self):
+        short_tensor = torch.zeros((1, 300))
+        q = self.processor.assess_audio_quality(short_tensor, sample_rate=16000)
+        self.assertEqual(q["quality"], "INSUFFICIENT_SPEECH")
+        self.assertFalse(q["isUsable"])
+
 
 if __name__ == "__main__":
     unittest.main()

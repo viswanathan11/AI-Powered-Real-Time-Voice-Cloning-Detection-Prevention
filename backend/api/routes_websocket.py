@@ -133,12 +133,21 @@ async def websocket_session_stream(websocket: WebSocket, session_id: str):
             previous_running_risk = running_risk
             total_latency = round((time.perf_counter() - t0) * 1000, 2)
 
+            speaker_decision = ml_result.get("speakerDecision", "MATCH" if speaker_match_score >= 0.50 else "MISMATCH")
+            audio_quality = ml_result.get("audioQuality", "INSUFFICIENT_SPEECH" if is_silent else "GOOD")
+            evidence_confidence = float(ml_result.get("evidenceConfidence", 0.0 if is_silent else 1.0))
+            classification = ml_result.get("classification", "GENUINE" if verdict == "AUTHENTIC_EXECUTIVE" else ("AI_CLONE_SUSPECTED" if verdict == "CRITICAL_AI_CLONE" else ("HUMAN_IMPERSONATOR" if verdict == "IMPOSTER_MISMATCH" else "UNCERTAIN")))
+
             # Step C: Prepare JSON Response according to Plane.md contract
             response_payload = {
                 "sessionId": session_id,
                 "chunkSeq": chunk_seq,
                 "syntheticScore": round(synthetic_score, 4),
                 "speakerMatchScore": round(speaker_match_score, 4),
+                "speakerDecision": speaker_decision,
+                "audioQuality": audio_quality,
+                "evidenceConfidence": round(evidence_confidence, 3),
+                "classification": classification,
                 "cosineSimilarity": round(cosine_sim, 4) if cosine_sim is not None else None,
                 "runningRisk": round(running_risk, 4),
                 "riskLevel": risk_level,

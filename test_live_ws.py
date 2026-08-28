@@ -5,7 +5,7 @@ import struct
 import urllib.request
 import websockets
 
-async def test_full_session_flow():
+async def run_full_session_flow():
     payloads = json.load(open('samples/sample_payloads.json'))
     
     # 1. Enroll authentic CFO voice into Voice Vault
@@ -91,4 +91,4 @@ async def test_full_session_flow():
         print(f"  Alert Triggered: {res3['alertTriggered']}")
 
 if __name__ == '__main__':
-    asyncio.run(test_full_session_flow())
+    asyncio.run(run_full_session_flow())
