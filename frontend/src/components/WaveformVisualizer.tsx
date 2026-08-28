@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Activity, Mic, Radio } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 interface WaveformVisualizerProps {
   analyserNode: AnalyserNode | null;
@@ -31,8 +31,20 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
 
     const render = () => {
       time += 0.04;
-      const width = canvas.width;
-      const height = canvas.height;
+      
+      // Auto-fit canvas internal buffer to actual rendered dimensions for ultra-sharp rendering
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const targetWidth = Math.round(rect.width * dpr);
+      const targetHeight = Math.round(rect.height * dpr);
+
+      if (targetWidth > 0 && targetHeight > 0 && (canvas.width !== targetWidth || canvas.height !== targetHeight)) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+      }
+
+      const width = canvas.width || 600;
+      const height = canvas.height || 80;
 
       // Dark background
       ctx.fillStyle = '#060a13';

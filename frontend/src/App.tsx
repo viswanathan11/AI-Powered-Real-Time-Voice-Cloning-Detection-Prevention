@@ -14,7 +14,6 @@ import { SecurityDashboard } from './components/SecurityDashboard';
 import { EnrollmentView } from './components/EnrollmentView';
 import { SessionHistoryView } from './components/SessionHistoryView';
 import { ArchitectureView } from './components/ArchitectureView';
-import { ShieldCheck, Radio, AlertTriangle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('defense');
@@ -193,7 +192,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 z-10">
+      <main className="flex-1 max-w-[1640px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 z-10">
         {activeTab === 'defense' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Split Screen Left: Threat Simulator (5 cols) */}
@@ -239,7 +238,7 @@ export const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="w-full bg-[#05080f]/80 border-t border-slate-800/60 py-3.5 text-center text-xs font-mono text-slate-500 z-10 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="max-w-[1640px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
             VoiceShield AI • SIH26104 Voice Cloning Detection &amp; Prevention
           </span>

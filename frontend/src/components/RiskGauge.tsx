@@ -1,6 +1,6 @@
 import React from 'react';
 import { RiskLevel, Recommendation } from '../types';
-import { ShieldCheck, AlertTriangle, Flame, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, Flame } from 'lucide-react';
 
 interface RiskGaugeProps {
   riskScore: number; // 0.0 to 1.0
