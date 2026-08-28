@@ -26,7 +26,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     callerNumber: '+91 98765 43210',
     filename: 'cfo_ai_clone_attack_chunk.wav',
     expectedRiskLevel: 'CRITICAL',
-    expectedRecommendation: 'VERIFY_CALLBACK',
+    expectedRecommendation: 'ESCALATE',
   },
   {
     id: 'scenario_cfo_genuine',

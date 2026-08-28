@@ -29,7 +29,7 @@ class Settings(BaseModel):
 
     # Speaker Verification (ECAPA-TDNN)
     ECAPA_MODEL_SOURCE: str = os.getenv("ECAPA_MODEL_SOURCE", "speechbrain/spkrec-ecapa-voxceleb")
-    ECAPA_SAVEDIR: Path = Path(os.getenv("ECAPA_SAVEDIR", "ml_service/models_cache/ecapa"))
+    ECAPA_SAVEDIR: Path = Path(os.getenv("ECAPA_SAVEDIR", "ml_service/models_cache/ecapa_real"))
     SPEAKER_EMBEDDING_DIM: int = 192
     SPEAKER_SIMILARITY_THRESHOLD: float = 0.50
 

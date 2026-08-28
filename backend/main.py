@@ -65,7 +65,9 @@ async def lifespan(app: FastAPI):
         async with AsyncSessionLocal() as db:
             profiles, total = await VoiceprintService.list_profiles(db, limit=1)
             if total == 0:
-                payloads_path = ROOT_DIR / "frontend" / "public" / "sample_payloads.json"
+                payloads_path = ROOT_DIR / "samples" / "sample_payloads.json"
+                if not payloads_path.exists():
+                    payloads_path = ROOT_DIR / "frontend" / "public" / "sample_payloads.json"
                 if not payloads_path.exists():
                     payloads_path = ROOT_DIR / "ml_service" / "samples" / "sample_payloads.json"
                 if payloads_path.exists():

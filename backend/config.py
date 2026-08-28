@@ -43,7 +43,8 @@ class Settings(BaseModel):
     TARGET_CHUNK_DURATION_SEC: float = 3.0
     CHUNK_SEQ_HEADER_BYTES: int = 4  # 4-byte chunk sequence number header in binary WebSocket frames
 
-    # Risk Engine Default Weights (Plane.md section 4: runningRisk = 0.5*synthetic + 0.5*(1-speakerMatch))
+    # Risk Engine Default Weights (Plane.md section 4)
+    SYNTHETIC_SCORE_THRESHOLD: float = float(os.getenv("SYNTHETIC_SCORE_THRESHOLD", "0.60"))
     SYNTHETIC_WEIGHT: float = float(os.getenv("SYNTHETIC_WEIGHT", "0.5"))
     SPEAKER_MISMATCH_WEIGHT: float = float(os.getenv("SPEAKER_MISMATCH_WEIGHT", "0.5"))
 

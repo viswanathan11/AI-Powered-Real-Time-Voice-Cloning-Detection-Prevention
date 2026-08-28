@@ -100,12 +100,14 @@ async def websocket_session_stream(websocket: WebSocket, session_id: str):
                 )
                 synthetic_score = float(ml_result.get("syntheticScore", 0.0))
                 speaker_match_score = float(ml_result.get("speakerMatchScore", 1.0 if not has_enrolled_profile else 0.0))
+                cosine_sim = ml_result.get("cosineSimilarity")
                 is_silent = bool(ml_result.get("isSilent", False))
                 inference_latency = float(ml_result.get("latencyMs", 0.0))
             except Exception as ml_err:
                 logger.error(f"ML inference error on chunk {chunk_seq}: {ml_err}")
                 synthetic_score = 0.50
                 speaker_match_score = 0.50
+                cosine_sim = None
                 is_silent = False
                 inference_latency = 0.0
 
@@ -122,6 +124,8 @@ async def websocket_session_stream(websocket: WebSocket, session_id: str):
             running_risk = risk_eval["runningRisk"]
             risk_level = risk_eval["riskLevel"]
             recommendation = risk_eval["recommendation"]
+            verdict = risk_eval.get("verdict", ml_result.get("verdict", "SAFE_CALL") if 'ml_result' in locals() else "SAFE_CALL")
+            verdict_label = risk_eval.get("verdictLabel", ml_result.get("verdictLabel", "Natural Human Voice") if 'ml_result' in locals() else "Natural Human Voice")
             alert_triggered = risk_eval["alertTriggered"]
             alert_type = risk_eval["alertType"]
             alert_reason = risk_eval["reason"]
@@ -135,9 +139,12 @@ async def websocket_session_stream(websocket: WebSocket, session_id: str):
                 "chunkSeq": chunk_seq,
                 "syntheticScore": round(synthetic_score, 4),
                 "speakerMatchScore": round(speaker_match_score, 4),
+                "cosineSimilarity": round(cosine_sim, 4) if cosine_sim is not None else None,
                 "runningRisk": round(running_risk, 4),
                 "riskLevel": risk_level,
                 "recommendation": recommendation,
+                "verdict": verdict,
+                "verdictLabel": verdict_label,
                 "latencyMs": total_latency,
                 "isSilent": is_silent,
                 "alertTriggered": alert_triggered

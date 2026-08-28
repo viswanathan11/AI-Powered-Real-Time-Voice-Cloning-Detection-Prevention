@@ -99,8 +99,16 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
     setTotalBytesSent(0);
 
     try {
+      // For preset attacks and live calls, ensure a claimed profile is targeted
+      let profileToClaim = selectedProfileId;
+      if (!profileToClaim && profiles.length > 0) {
+        const matched = profiles.find((p) => p.personName.toLowerCase().includes('ramesh')) || profiles[0];
+        profileToClaim = matched.profileId;
+        onSelectProfileId(profileToClaim);
+      }
+
       await onStartCall({
-        claimedIdentity: selectedProfileId,
+        claimedIdentity: profileToClaim,
         callType,
         amount,
         callerNumber,
@@ -132,16 +140,16 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         }
 
         simTimerRef.current = window.setInterval(() => {
-          if (currentIdx < slicedChunks.length) {
-            const nextChunk = slicedChunks[currentIdx];
-            setChunksSentCount((c) => c + 1);
-            setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
-            setRmsLevel(nextChunk.rmsLevel);
-            onChunkReady(nextChunk);
-            currentIdx++;
-          } else {
+          if (slicedChunks.length === 0) return;
+          if (currentIdx >= slicedChunks.length) {
             currentIdx = 0;
           }
+          const nextChunk = slicedChunks[currentIdx];
+          setChunksSentCount((c) => c + 1);
+          setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
+          setRmsLevel(nextChunk.rmsLevel);
+          onChunkReady(nextChunk);
+          currentIdx++;
         }, 3000);
       } else if (sourceMode === 'file') {
         if (uploadedChunks.length === 0) {
@@ -161,16 +169,16 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         }
 
         simTimerRef.current = window.setInterval(() => {
-          if (currentIdx < uploadedChunks.length) {
-            const nextChunk = uploadedChunks[currentIdx];
-            setChunksSentCount((c) => c + 1);
-            setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
-            setRmsLevel(nextChunk.rmsLevel);
-            onChunkReady(nextChunk);
-            currentIdx++;
-          } else {
+          if (uploadedChunks.length === 0) return;
+          if (currentIdx >= uploadedChunks.length) {
             currentIdx = 0;
           }
+          const nextChunk = uploadedChunks[currentIdx];
+          setChunksSentCount((c) => c + 1);
+          setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
+          setRmsLevel(nextChunk.rmsLevel);
+          onChunkReady(nextChunk);
+          currentIdx++;
         }, 3000);
       }
     } catch (err: unknown) {
@@ -284,18 +292,28 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
       {/* Preset Scenario Selector - Clean Horizontal Grid */}
       {sourceMode === 'preset' && (
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {DEMO_SCENARIOS.map((sc) => {
               const isSelected = selectedScenario.id === sc.id;
-              let activeBorder = 'border-rose-500/60 bg-rose-950/30 text-rose-200';
-              let badgeColor = 'bg-rose-500/20 text-rose-300';
+              let activeBorder = 'border-rose-500/70 bg-gradient-to-br from-rose-950/40 to-slate-950/80 text-rose-200 shadow-md shadow-rose-950/30';
+              let badgeColor = 'bg-rose-500/25 text-rose-300 border border-rose-500/30';
+              let dotColor = 'bg-rose-500 shadow-[0_0_8px_#f43f5e]';
+              let scenarioTitle = '1. AI Clone Attack';
+              let scenarioSub = 'Neural Vocoder Deepfake';
+
               if (sc.category === 'genuine') {
-                activeBorder = 'border-emerald-500/60 bg-emerald-950/30 text-emerald-200';
-                badgeColor = 'bg-emerald-500/20 text-emerald-300';
+                activeBorder = 'border-emerald-500/70 bg-gradient-to-br from-emerald-950/40 to-slate-950/80 text-emerald-200 shadow-md shadow-emerald-950/30';
+                badgeColor = 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/30';
+                dotColor = 'bg-emerald-400 shadow-[0_0_8px_#34d399]';
+                scenarioTitle = '2. Genuine Executive';
+                scenarioSub = 'Authentic CFO Voice';
               } else if (sc.category === 'impersonator') {
-                activeBorder = 'border-amber-500/60 bg-amber-950/30 text-amber-200';
-                badgeColor = 'bg-amber-500/20 text-amber-300';
+                activeBorder = 'border-amber-500/70 bg-gradient-to-br from-amber-950/40 to-slate-950/80 text-amber-200 shadow-md shadow-amber-950/30';
+                badgeColor = 'bg-amber-500/25 text-amber-300 border border-amber-500/30';
+                dotColor = 'bg-amber-400 shadow-[0_0_8px_#fbbf24]';
+                scenarioTitle = '3. Human Imposter';
+                scenarioSub = 'Voice Mismatch (Scammer)';
               }
 
               return (
@@ -304,41 +322,42 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
                   type="button"
                   disabled={isStreaming}
                   onClick={() => setSelectedScenario(sc)}
-                  className={`p-2.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
+                  className={`p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer ${
                     isSelected
-                      ? `${activeBorder} shadow-sm ring-1 ring-white/10`
-                      : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700 text-slate-300'
+                      ? `${activeBorder} ring-1 ring-white/20 scale-[1.02]`
+                      : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700 text-slate-300 hover:bg-slate-900/60'
                   }`}
                 >
-                  <div className="flex items-center space-x-1.5 mb-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        sc.category === 'clone_attack'
-                          ? 'bg-rose-500'
-                          : sc.category === 'genuine'
-                          ? 'bg-emerald-400'
-                          : 'bg-amber-400'
-                      }`}
-                    />
-                    <span className="text-xs font-bold truncate">
-                      {sc.category === 'clone_attack'
-                        ? 'AI Clone Attack'
-                        : sc.category === 'genuine'
-                        ? 'Genuine Call'
-                        : 'Impersonator'}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center space-x-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
+                        <span className="text-xs font-bold tracking-tight text-white">
+                          {scenarioTitle}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono mb-2">
+                      {scenarioSub}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-slate-800/60">
+                    <span className="text-[10px] font-mono text-slate-400">Threat Risk:</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold ${badgeColor}`}>
+                      {sc.expectedRiskLevel}
                     </span>
                   </div>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded self-start ${badgeColor}`}>
-                    {sc.expectedRiskLevel}
-                  </span>
                 </button>
               );
             })}
           </div>
 
           {/* Selected Scenario Brief */}
-          <div className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3 text-xs text-slate-300">
-            <p className="line-clamp-2 text-slate-400 text-[11px] leading-relaxed">
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs text-slate-300 shadow-inner">
+            <div className="flex items-center space-x-1.5 text-slate-400 font-mono text-[10px] mb-1 uppercase font-bold">
+              <span>Attack Simulation Vector:</span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
               {selectedScenario.description}
             </p>
           </div>
@@ -347,11 +366,14 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
       {/* Live Mic Info Banner */}
       {sourceMode === 'mic' && (
-        <div className="bg-cyan-950/20 border border-cyan-500/20 rounded-xl p-3 text-xs text-cyan-200 flex items-center space-x-2.5">
-          <Mic className="w-4 h-4 text-cyan-400 shrink-0" />
-          <span className="text-[11px] text-slate-300 leading-normal">
-            Streaming uncompressed <strong>16kHz Mono 16-bit PCM</strong> from your microphone in 3-second frames.
-          </span>
+        <div className="bg-cyan-950/30 border border-cyan-500/30 rounded-xl p-3.5 text-xs text-cyan-200 flex items-center space-x-3 shadow-inner">
+          <div className="p-2 bg-cyan-500/20 rounded-lg border border-cyan-500/30 shrink-0">
+            <Mic className="w-4 h-4 text-cyan-400 animate-pulse" />
+          </div>
+          <div className="text-[11px] text-slate-300 leading-relaxed">
+            <span className="text-cyan-300 font-bold block mb-0.5">Live Local Microphone Stream:</span>
+            Capturing uncompressed <strong>16,000 Hz Mono 16-bit PCM</strong> audio in 3.0-second sliding windows for zero-latency neural classification.
+          </div>
         </div>
       )}
 
