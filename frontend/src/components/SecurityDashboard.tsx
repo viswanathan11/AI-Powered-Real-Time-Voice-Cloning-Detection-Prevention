@@ -99,6 +99,18 @@ export const SecurityDashboard: React.FC<SecurityDashboardProps> = ({
 
         {/* Latency & Processing Badge */}
         <div className="flex items-center space-x-2">
+          {chunkHistory.length > 0 && !isStreaming && (
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-emerald-950/80 border border-emerald-500/30 rounded-lg text-xs font-mono text-emerald-300 shadow-inner">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{chunkHistory.length} Chunks Verified</span>
+            </div>
+          )}
+          {isStreaming && (
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-rose-950/80 border border-rose-500/30 rounded-lg text-xs font-mono text-rose-300 shadow-inner">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+              <span>Analyzing #{chunkHistory.length + 1}</span>
+            </div>
+          )}
           <div className="flex items-center space-x-1.5 px-3 py-1 bg-slate-950/80 border border-slate-800 rounded-lg text-xs font-mono text-cyan-400 shadow-inner">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
             <span>{latencyMs > 0 ? `${latencyMs.toFixed(1)}ms` : '< 40ms'}</span>

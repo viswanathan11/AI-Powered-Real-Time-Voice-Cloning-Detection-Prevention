@@ -168,12 +168,24 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           {isActive ? (
             <span className="flex items-center space-x-1.5 text-emerald-400 font-mono text-[11px] font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{mode === 'mic' ? 'Live Microphone' : 'Audio Stream Active'}</span>
+              <span>
+                {mode === 'mic'
+                  ? 'Live Microphone Input'
+                  : mode === 'file'
+                  ? 'Audio File Stream (No Mic)'
+                  : 'Scenario Audio Stream'}
+              </span>
             </span>
           ) : (
             <span className="flex items-center space-x-1.5 text-slate-500 font-mono text-[11px]">
               <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-              <span>Awaiting Stream</span>
+              <span>
+                {mode === 'file'
+                  ? 'Audio File Ready (Mic Disabled)'
+                  : mode === 'mic'
+                  ? 'Microphone Standby'
+                  : 'Awaiting Stream'}
+              </span>
             </span>
           )}
         </div>
@@ -192,7 +204,11 @@ export const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
           <div className="absolute inset-0 flex items-center justify-center bg-slate-950/30 pointer-events-none">
             <span className="text-xs text-slate-500 font-mono flex items-center space-x-1.5">
               <Activity className="w-3.5 h-3.5 text-slate-600" />
-              <span>Ready for incoming audio</span>
+              <span>
+                {mode === 'file'
+                  ? 'Ready to verify uploaded audio chunks'
+                  : 'Ready for incoming audio'}
+              </span>
             </span>
           </div>
         )}

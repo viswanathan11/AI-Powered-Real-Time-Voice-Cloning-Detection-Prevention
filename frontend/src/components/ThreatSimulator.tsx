@@ -13,6 +13,7 @@ import {
   Upload,
   Sparkles,
   Settings2,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface ThreatSimulatorProps {
@@ -45,6 +46,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
   const [sourceMode, setSourceMode] = useState<'preset' | 'mic' | 'file'>('preset');
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario>(DEMO_SCENARIOS[0]);
   const [isStarting, setIsStarting] = useState(false);
+  const [isVerificationComplete, setIsVerificationComplete] = useState(false);
 
   // Context form state
   const [callType, setCallType] = useState<string>('fund_transfer_approval');
@@ -91,14 +93,28 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
     }
   }, [isStreaming]);
 
+  // Mode Switch Handler
+  const handleModeChange = (mode: 'preset' | 'mic' | 'file') => {
+    if (isStreaming) return;
+    setSourceMode(mode);
+    setIsVerificationComplete(false);
+    audioCaptureEngine.stop();
+  };
+
   // Handle Start Call
   const handleStartCall = async () => {
     if (isStarting || isStreaming) return;
     setIsStarting(true);
+    setIsVerificationComplete(false);
     setChunksSentCount(0);
     setTotalBytesSent(0);
 
     try {
+      // Ensure microphone engine is cleanly stopped before non-mic modes
+      if (sourceMode !== 'mic') {
+        audioCaptureEngine.stop();
+      }
+
       // For preset attacks and live calls, ensure a claimed profile is targeted
       let profileToClaim = selectedProfileId;
       if (!profileToClaim && profiles.length > 0) {
@@ -125,32 +141,54 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           onError: (err) => alert(`Microphone error: ${err.message}`),
         });
       } else if (sourceMode === 'preset') {
+        audioCaptureEngine.stop();
         const base64Audio = await getScenarioAudioBase64(selectedScenario.filename);
         const slicedChunks = await audioCaptureEngine.sliceAudioIntoChunks(base64Audio);
+        const total = slicedChunks.length;
 
-        let currentIdx = 0;
-
-        if (slicedChunks.length > 0) {
-          const first = slicedChunks[0];
-          setChunksSentCount(1);
-          setTotalBytesSent(first.binaryFrame.byteLength);
-          setRmsLevel(first.rmsLevel);
-          onChunkReady(first);
-          currentIdx = 1;
+        if (total === 0) {
+          throw new Error('Could not extract scenario audio chunks.');
         }
 
-        simTimerRef.current = window.setInterval(() => {
-          if (slicedChunks.length === 0) return;
-          if (currentIdx >= slicedChunks.length) {
-            currentIdx = 0;
-          }
-          const nextChunk = slicedChunks[currentIdx];
-          setChunksSentCount((c) => c + 1);
-          setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
-          setRmsLevel(nextChunk.rmsLevel);
-          onChunkReady(nextChunk);
-          currentIdx++;
-        }, 3000);
+        const first = slicedChunks[0];
+        setChunksSentCount(1);
+        setTotalBytesSent(first.binaryFrame.byteLength);
+        setRmsLevel(first.rmsLevel);
+        onChunkReady(first);
+
+        if (total === 1) {
+          // Exactly 1 chunk: wait 3s for WebSocket inference to return, then end stream
+          simTimerRef.current = window.setTimeout(async () => {
+            setRmsLevel(0);
+            await handleEndCall();
+            setIsVerificationComplete(true);
+          }, 3000);
+        } else {
+          // Multiple chunks: send each chunk at 3s intervals, then stop cleanly
+          let currentIdx = 1;
+          simTimerRef.current = window.setInterval(async () => {
+            if (currentIdx < total) {
+              const nextChunk = slicedChunks[currentIdx];
+              setChunksSentCount(currentIdx + 1);
+              setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
+              setRmsLevel(nextChunk.rmsLevel);
+              onChunkReady(nextChunk);
+              currentIdx++;
+
+              if (currentIdx >= total) {
+                if (simTimerRef.current) {
+                  clearInterval(simTimerRef.current);
+                  simTimerRef.current = null;
+                }
+                simTimerRef.current = window.setTimeout(async () => {
+                  setRmsLevel(0);
+                  await handleEndCall();
+                  setIsVerificationComplete(true);
+                }, 3000);
+              }
+            }
+          }, 3000);
+        }
       } else if (sourceMode === 'file') {
         if (uploadedChunks.length === 0) {
           alert('Please select or upload an audio file (.wav or .mp3) first.');
@@ -158,28 +196,49 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           return;
         }
 
-        let currentIdx = 0;
-        if (uploadedChunks.length > 0) {
-          const first = uploadedChunks[0];
-          setChunksSentCount(1);
-          setTotalBytesSent(first.binaryFrame.byteLength);
-          setRmsLevel(first.rmsLevel);
-          onChunkReady(first);
-          currentIdx = 1;
-        }
+        audioCaptureEngine.stop();
+        const total = uploadedChunks.length;
+        const first = uploadedChunks[0];
 
-        simTimerRef.current = window.setInterval(() => {
-          if (uploadedChunks.length === 0) return;
-          if (currentIdx >= uploadedChunks.length) {
-            currentIdx = 0;
-          }
-          const nextChunk = uploadedChunks[currentIdx];
-          setChunksSentCount((c) => c + 1);
-          setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
-          setRmsLevel(nextChunk.rmsLevel);
-          onChunkReady(nextChunk);
-          currentIdx++;
-        }, 3000);
+        setChunksSentCount(1);
+        setTotalBytesSent(first.binaryFrame.byteLength);
+        setRmsLevel(first.rmsLevel);
+        onChunkReady(first);
+
+        if (total === 1) {
+          // Exactly 1 chunk: wait 3s for WebSocket inference to return, then end stream
+          simTimerRef.current = window.setTimeout(async () => {
+            setRmsLevel(0);
+            await handleEndCall();
+            setIsVerificationComplete(true);
+          }, 3000);
+        } else {
+          // Multiple chunks: send chunks 1 to N sequentially, then stop cleanly
+          let currentIdx = 1;
+          simTimerRef.current = window.setInterval(async () => {
+            if (currentIdx < total) {
+              const nextChunk = uploadedChunks[currentIdx];
+              setChunksSentCount(currentIdx + 1);
+              setTotalBytesSent((b) => b + nextChunk.binaryFrame.byteLength);
+              setRmsLevel(nextChunk.rmsLevel);
+              onChunkReady(nextChunk);
+              currentIdx++;
+
+              if (currentIdx >= total) {
+                // All chunks from file sent! Clear interval and schedule final completion
+                if (simTimerRef.current) {
+                  clearInterval(simTimerRef.current);
+                  simTimerRef.current = null;
+                }
+                simTimerRef.current = window.setTimeout(async () => {
+                  setRmsLevel(0);
+                  await handleEndCall();
+                  setIsVerificationComplete(true);
+                }, 3000);
+              }
+            }
+          }, 3000);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -194,9 +253,11 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
   const handleEndCall = async () => {
     if (simTimerRef.current) {
       clearInterval(simTimerRef.current);
+      clearTimeout(simTimerRef.current);
       simTimerRef.current = null;
     }
     audioCaptureEngine.stop();
+    setRmsLevel(0);
     await onEndCall();
   };
 
@@ -206,6 +267,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
     if (!file) return;
 
     try {
+      setIsVerificationComplete(false);
       setUploadedFileName(file.name);
       const chunks = await audioCaptureEngine.sliceAudioIntoChunks(file);
       setUploadedChunks(chunks);
@@ -250,7 +312,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         <button
           type="button"
           disabled={isStreaming}
-          onClick={() => setSourceMode('preset')}
+          onClick={() => handleModeChange('preset')}
           className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'preset'
               ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm'
@@ -264,7 +326,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         <button
           type="button"
           disabled={isStreaming}
-          onClick={() => setSourceMode('mic')}
+          onClick={() => handleModeChange('mic')}
           className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'mic'
               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
@@ -278,7 +340,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         <button
           type="button"
           disabled={isStreaming}
-          onClick={() => setSourceMode('file')}
+          onClick={() => handleModeChange('file')}
           className={`flex items-center justify-center space-x-1.5 py-2 px-2.5 rounded-lg text-xs font-medium transition-all ${
             sourceMode === 'file'
               ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-sm'
@@ -379,11 +441,11 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
       {/* File Upload Mode */}
       {sourceMode === 'file' && (
-        <div className="space-y-2">
-          <label className="flex items-center justify-center space-x-2 p-3.5 bg-slate-950/60 border border-dashed border-slate-700/80 hover:border-slate-600 rounded-xl cursor-pointer transition">
-            <Upload className="w-4 h-4 text-slate-400" />
+        <div className="space-y-2.5">
+          <label className="flex items-center justify-center space-x-2 p-3.5 bg-slate-950/60 border border-dashed border-indigo-500/40 hover:border-indigo-400/70 rounded-xl cursor-pointer transition">
+            <Upload className="w-4 h-4 text-indigo-400" />
             <span className="text-xs font-mono text-slate-300">
-              {uploadedFileName || 'Choose .wav or .mp3 voice file'}
+              {uploadedFileName || 'Choose .wav or .mp3 voice file to verify'}
             </span>
             <input
               type="file"
@@ -393,10 +455,31 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
               className="hidden"
             />
           </label>
+
           {uploadedChunks.length > 0 && (
-            <p className="text-[11px] text-emerald-400 font-mono">
-              ✓ Ready: {uploadedChunks.length} chunks ({(uploadedChunks.length * 3).toFixed(0)}s at 16kHz)
-            </p>
+            <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 space-y-1 font-mono text-xs">
+              <div className="flex items-center justify-between text-emerald-400 font-semibold">
+                <span className="truncate max-w-[240px]">✓ {uploadedFileName}</span>
+                <span>{uploadedChunks.length} Chunks</span>
+              </div>
+              <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                <span>Duration: {(uploadedChunks.length * 3).toFixed(0)}s (16kHz PCM)</span>
+                <span className="text-indigo-300 font-sans">No Mic Required</span>
+              </div>
+            </div>
+          )}
+
+          {isVerificationComplete && (
+            <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3.5 text-xs text-emerald-200 flex items-center space-x-3 shadow-inner">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <span className="font-bold block text-emerald-300">File Verification Finished</span>
+                <span className="text-[11px] text-slate-300">
+                  Successfully evaluated all {uploadedChunks.length} chunks against{' '}
+                  <strong>{profiles.find((p) => p.profileId === selectedProfileId)?.personName || 'enrolled profile'}</strong>. Stream stopped automatically.
+                </span>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -481,7 +564,7 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
 
       {/* Waveform Visualizer */}
       <WaveformVisualizer
-        analyserNode={audioCaptureEngine.analyserNode}
+        analyserNode={sourceMode === 'mic' ? audioCaptureEngine.analyserNode : null}
         isActive={isStreaming}
         rmsLevel={rmsLevel}
         chunkProgressSec={chunkProgressSec}
@@ -497,7 +580,10 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
         </div>
         <div>
           <div className="text-[10px] text-slate-500 uppercase font-sans">Chunks</div>
-          <div className="text-xs font-semibold text-cyan-400 mt-0.5">#{chunksSentCount}</div>
+          <div className="text-xs font-semibold text-cyan-400 mt-0.5">
+            #{chunksSentCount}
+            {sourceMode === 'file' && uploadedChunks.length > 0 ? ` / ${uploadedChunks.length}` : ''}
+          </div>
         </div>
         <div>
           <div className="text-[10px] text-slate-500 uppercase font-sans">Sent</div>
@@ -515,13 +601,31 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
           <button
             type="button"
             onClick={handleStartCall}
-            disabled={isStarting}
-            className={`w-full py-3 px-4 bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-rose-950/40 transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer ${
-              isStarting ? 'opacity-75 cursor-wait' : ''
+            disabled={isStarting || (sourceMode === 'file' && uploadedChunks.length === 0)}
+            className={`w-full py-3 px-4 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer ${
+              sourceMode === 'file'
+                ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 shadow-indigo-950/40'
+                : sourceMode === 'mic'
+                ? 'bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-cyan-950/40'
+                : 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 hover:from-rose-500 hover:to-amber-500 shadow-rose-950/40'
+            } ${
+              isStarting || (sourceMode === 'file' && uploadedChunks.length === 0)
+                ? 'opacity-60 cursor-not-allowed'
+                : ''
             }`}
           >
             <Phone className={`w-4 h-4 ${isStarting ? 'animate-spin' : ''}`} />
-            <span>{isStarting ? 'CONNECTING STREAM...' : 'START STREAM SIMULATION'}</span>
+            <span>
+              {isStarting
+                ? 'INITIALIZING SESSION...'
+                : sourceMode === 'file'
+                ? uploadedChunks.length > 0
+                  ? `VERIFY AUDIO FILE (${uploadedChunks.length} CHUNKS)`
+                  : 'UPLOAD AUDIO FILE TO VERIFY'
+                : sourceMode === 'mic'
+                ? 'START LIVE MIC STREAM'
+                : 'START SCENARIO SIMULATION'}
+            </span>
           </button>
         ) : (
           <button
@@ -530,7 +634,11 @@ export const ThreatSimulator: React.FC<ThreatSimulatorProps> = ({
             className="w-full py-3 px-4 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 text-xs tracking-wide cursor-pointer animate-pulse"
           >
             <PhoneOff className="w-4 h-4" />
-            <span>DISCONNECT STREAM</span>
+            <span>
+              {sourceMode === 'file'
+                ? `VERIFYING FILE (${chunksSentCount}/${uploadedChunks.length}) — STOP EARLY`
+                : 'DISCONNECT STREAM'}
+            </span>
           </button>
         )}
       </div>

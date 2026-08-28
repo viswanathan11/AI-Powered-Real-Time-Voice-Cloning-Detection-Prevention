@@ -500,6 +500,7 @@ export class AudioCaptureEngine {
 
   stop(): void {
     this.isRecording = false;
+    this.isContinuousRecording = false;
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = null;
@@ -512,11 +513,21 @@ export class AudioCaptureEngine {
       this.sourceNode.disconnect();
       this.sourceNode = null;
     }
+    if (this.analyserNode) {
+      this.analyserNode.disconnect();
+      this.analyserNode = null;
+    }
     if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
+      try {
+        this.audioContext.close();
+      } catch {
+        // AudioContext may already be closing or closed
+      }
       this.audioContext = null;
     }
+    this.callbacks = null;
     this.sampleBuffer = [];
+    this.continuousSampleBuffer = [];
     this.accumulatedInputSamples = 0;
   }
 
